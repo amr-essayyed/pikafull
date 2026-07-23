@@ -49,7 +49,7 @@ export async function createCustomer(data: { full_name: string; email: string; p
   if (process.env.RESEND_API_KEY) {
     try {
       const { error: resendError } = await resend.emails.send({
-        from: 'onboarding@resend.dev',
+        from: 'Pikafull <noreply@4teq.store>',
         to: data.email,
         subject: 'Welcome to Pikafull! Your Account Details',
         html: `<p>Hello ${data.full_name},</p><p>Your account has been created successfully.</p><p>Your login email is: <strong>${data.email}</strong><br/>Your generated password is: <strong>${password}</strong></p><p>Please log in and change your password as soon as possible.</p>`
@@ -134,7 +134,7 @@ export async function createEmployee(data: { full_name: string; email: string; p
   if (process.env.RESEND_API_KEY) {
     try {
       const { error: resendError } = await resend.emails.send({
-        from: 'onboarding@resend.dev',
+        from: 'Pikafull <noreply@4teq.store>',
         to: data.email,
         subject: 'Welcome to Pikafull! Your Employee Account',
         html: `<p>Hello ${data.full_name},</p><p>Your employee account has been created successfully.</p><p>Your login email is: <strong>${data.email}</strong><br/>Your generated password is: <strong>${password}</strong></p><p>Please log in and change your password as soon as possible.</p>`
