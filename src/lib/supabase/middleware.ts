@@ -39,11 +39,11 @@ export async function updateSession(request: NextRequest) {
   const isCustomerRoute = path.startsWith('/customer')
   const isAuthRoute = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/admin')
 
-  // Use metadata role if available, otherwise fallback to database
-  let userRole = user?.user_metadata?.role
+  // Fetch role: check app_metadata (JWT claim) first for 0ms DB queries, fallback to profiles DB lookup
+  let userRole = user?.app_metadata?.role as string | undefined
   if (user && !userRole) {
     const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    userRole = data?.role
+    userRole = data?.role || (user.user_metadata?.role as string | undefined)
   }
 
   if (isAuthRoute && user) {
