@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { BigCalendar } from "@/components/dashboard/big-calendar"
-import { getDashboardStats, getAllBookings } from "@/actions/queries"
+import { getDashboardStats, getAllBookings, getAllEmployees } from "@/actions/queries"
 import { CalendarDays, DollarSign, Users, Briefcase } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 
@@ -26,11 +26,19 @@ export default async function DashboardOverviewPage() {
   }
 
   let allBookings = [] as any[]
+  let allEmployees = [] as any[]
 
   try {
-    stats = await getDashboardStats()
-    allBookings = await getAllBookings()
+    const [fetchedStats, fetchedBookings, fetchedEmployees] = await Promise.all([
+      getDashboardStats(),
+      getAllBookings(),
+      getAllEmployees(),
+    ])
+    stats = fetchedStats
+    allBookings = fetchedBookings
+    allEmployees = fetchedEmployees
   } catch { /* fallback to empty stats */ }
+
 
   const kpiCards = [
     {
@@ -88,7 +96,7 @@ export default async function DashboardOverviewPage() {
       <div className="grid gap-4 lg:grid-cols-1">
         {/* Calendar View */}
         <div className="h-[700px] w-full">
-          <BigCalendar bookings={allBookings} />
+          <BigCalendar bookings={allBookings} employees={allEmployees} />
         </div>
 
         {/* Recent Bookings */}

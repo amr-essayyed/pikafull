@@ -25,6 +25,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
+import { PhoneInput } from "@/components/ui/phone-input"
 import { bookingSchema, type BookingFormData } from "@/validators/booking"
 import { createBooking } from "@/actions/bookings"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -34,17 +35,29 @@ interface BookingWizardProps {
   extras?: any[]
   customers?: any[]
   isAdmin?: boolean
+  initialCustomerData?: {
+    phone?: string
+    addressLine1?: string
+    city?: string
+  }
 }
 
-export function BookingWizard({ services = [], extras = [], customers = [], isAdmin = false }: BookingWizardProps) {
+export function BookingWizard({
+  services = [],
+  extras = [],
+  customers = [],
+  isAdmin = false,
+  initialCustomerData,
+}: BookingWizardProps) {
   const t = useTranslations("BookingWizard")
   const [currentStep, setCurrentStep] = React.useState(0)
   const [error, setError] = React.useState<string | null>(null)
   const [isPending, startTransition] = React.useTransition()
   const [isSuccess, setIsSuccess] = React.useState(false)
+  const [datePopoverOpen, setDatePopoverOpen] = React.useState(false)
 
   const form = useForm<BookingFormData>({
-    resolver: zodResolver(bookingSchema),
+    resolver: zodResolver(bookingSchema) as any,
     defaultValues: {
       customerId: "",
       serviceId: "",
@@ -54,13 +67,36 @@ export function BookingWizard({ services = [], extras = [], customers = [], isAd
       extras: [],
       scheduledDate: undefined,
       scheduledTime: "",
-      addressLine1: "",
+      addressLine1: initialCustomerData?.addressLine1 || "",
       addressLine2: "",
-      city: "",
-      postalCode: "",
+      city: initialCustomerData?.city || "",
+      phone: initialCustomerData?.phone || "",
+      saveToProfile: true,
       paymentMethod: "online",
     },
   })
+
+  // Auto-populate customer details on mount if initialCustomerData is available
+  React.useEffect(() => {
+    if (initialCustomerData) {
+      if (initialCustomerData.addressLine1) form.setValue("addressLine1", initialCustomerData.addressLine1)
+      if (initialCustomerData.city) form.setValue("city", initialCustomerData.city)
+      if (initialCustomerData.phone) form.setValue("phone", initialCustomerData.phone)
+    }
+  }, [initialCustomerData, form])
+
+  // Handle admin customer selection to auto-fill address/city/phone
+  const handleCustomerChange = (selectedId: string) => {
+    form.setValue("customerId", selectedId)
+    if (selectedId && customers.length > 0) {
+      const cust = customers.find((c: any) => c.id === selectedId)
+      if (cust) {
+        if (cust.addressLine1) form.setValue("addressLine1", cust.addressLine1)
+        if (cust.city) form.setValue("city", cust.city)
+        if (cust.phone) form.setValue("phone", cust.phone)
+      }
+    }
+  }
 
   // Use real services from DB, fall back to defaults
   const displayServices = services.length > 0 ? services : [
@@ -123,7 +159,7 @@ export function BookingWizard({ services = [], extras = [], customers = [], isAd
       case "Date & Time":
         return ["scheduledDate", "scheduledTime"]
       case "Address & Payment":
-        return ["addressLine1", "city", "postalCode", "paymentMethod"]
+        return ["addressLine1", "city", "phone", "paymentMethod"]
       default:
         return []
     }
@@ -206,7 +242,11 @@ export function BookingWizard({ services = [], extras = [], customers = [], isAd
                       <FormControl>
                         <select
                           className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                          {...field}
+                          value={field.value || ""}
+                          onChange={(e) => {
+                            field.onChange(e)
+                            handleCustomerChange(e.target.value)
+                          }}
                         >
                           <option value="">{t('selectCustomerPlaceholder')}</option>
                           {customers.map((c: any) => (
@@ -309,43 +349,46 @@ export function BookingWizard({ services = [], extras = [], customers = [], isAd
                   <FormField
                     control={form.control}
                     name="scheduledDate"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>{t('date')}</FormLabel>
-                        <Popover>
-                          <PopoverTrigger render={
-                            <FormControl>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
+                    render={({ field }) => {
+                      const selectedDate = field.value ? new Date(field.value) : undefined
+                      const isDateValid = selectedDate && !isNaN(selectedDate.getTime())
+
+                      return (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>{t('date')}</FormLabel>
+                          <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+                            <PopoverTrigger
+                              type="button"
+                              className={cn(
+                                "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-left font-normal cursor-pointer",
+                                !isDateValid && "text-muted-foreground"
+                              )}
+                            >
+                              <span>
+                                {isDateValid ? format(selectedDate, "PPP") : t('pickDate')}
+                              </span>
+                              <CalendarIcon className="h-4 w-4 opacity-50 ml-2" />
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={isDateValid ? selectedDate : undefined}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    field.onChange(date)
+                                    setDatePopoverOpen(false)
+                                  }
+                                }}
+                                disabled={(date) =>
+                                  date < new Date(new Date().setHours(0, 0, 0, 0))
+                                }
                               />
-                            </FormControl>
-                          }>
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>{t('pickDate')}</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              disabled={(date) =>
-                                date < new Date(new Date().setHours(0, 0, 0, 0))
-                              }
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )
+                    }}
                   />
                   
                   <FormField
@@ -393,7 +436,7 @@ export function BookingWizard({ services = [], extras = [], customers = [], isAd
                       </FormItem>
                     )}
                   />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="city"
@@ -401,7 +444,7 @@ export function BookingWizard({ services = [], extras = [], customers = [], isAd
                         <FormItem>
                           <FormLabel>{t('city')}</FormLabel>
                           <FormControl>
-                            <Input placeholder="London" {...field} />
+                            <Input placeholder="Cairo" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -409,18 +452,50 @@ export function BookingWizard({ services = [], extras = [], customers = [], isAd
                     />
                     <FormField
                       control={form.control}
-                      name="postalCode"
+                      name="phone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t('postalCode')}</FormLabel>
+                          <FormLabel>{t('phone')}</FormLabel>
                           <FormControl>
-                            <Input placeholder="SW1A 1AA" {...field} />
+                            <PhoneInput
+                              id="booking-phone"
+                              name="phone"
+                              value={field.value || ""}
+                              onChange={field.onChange}
+                              required={true}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
+
+                  {/* Option to save address & phone as default in customer profile */}
+                  <FormField
+                    control={form.control}
+                    name="saveToProfile"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-4 bg-slate-50 dark:bg-slate-950/60 mt-4">
+                        <FormControl>
+                          <input
+                            type="checkbox"
+                            checked={field.value}
+                            onChange={field.onChange}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 mt-0.5 cursor-pointer"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel className="font-semibold text-sm cursor-pointer">
+                            {t('saveToProfile')}
+                          </FormLabel>
+                          <FormDescription className="text-xs text-muted-foreground">
+                            {t('saveToProfileDesc')}
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
                 </div>
               </div>
             )}

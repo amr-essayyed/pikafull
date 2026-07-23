@@ -5,14 +5,21 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.warn("[Resend] RESEND_API_KEY is missing from environment variables.")
+    return null
+  }
+  return new Resend(apiKey)
+}
 
 // Generate a random secure password
 function generatePassword() {
   return crypto.randomUUID().replace(/-/g, '') + '!A1'
 }
 
-export async function createCustomer(data: { full_name: string; email: string; phone?: string; notes?: string }) {
+export async function createCustomer(data: { full_name: string; email: string; phone?: string; notes?: string; address?: string; city?: string }) {
   const admin = createAdminClient()
   const password = generatePassword()
 
@@ -42,21 +49,39 @@ export async function createCustomer(data: { full_name: string; email: string; p
     await supabase.from("profiles").update({ phone: data.phone }).eq("id", userId)
   }
 
-  if (data.notes) {
-    await supabase.from("customers").update({ notes: data.notes }).eq("profile_id", userId)
+  const { data: custRecord } = await supabase.from("customers").select("id").eq("profile_id", userId).single()
+  const customerId = custRecord?.id
+
+  if (data.notes && customerId) {
+    await supabase.from("customers").update({ notes: data.notes }).eq("id", customerId)
   }
 
-  if (process.env.RESEND_API_KEY) {
+  if ((data.address || data.city) && customerId) {
+    await supabase.from("addresses").insert({
+      customer_id: customerId,
+      address_line_1: data.address || "",
+      city: data.city || "",
+      postal_code: ""
+    } as any)
+  }
+
+  const resend = getResendClient()
+  if (resend) {
     try {
-      const { error: resendError } = await resend.emails.send({
+      console.log(`[Resend] Sending welcome email to customer: ${data.email}`)
+      const { data: resendData, error: resendError } = await resend.emails.send({
         from: 'Pikafull <noreply@4teq.store>',
         to: data.email,
         subject: 'Welcome to Pikafull! Your Account Details',
         html: `<p>Hello ${data.full_name},</p><p>Your account has been created successfully.</p><p>Your login email is: <strong>${data.email}</strong><br/>Your generated password is: <strong>${password}</strong></p><p>Please log in and change your password as soon as possible.</p>`
       })
-      if (resendError) console.error("Resend API Error:", resendError)
+      if (resendError) {
+        console.error("[Resend API Error]:", resendError)
+      } else {
+        console.log("[Resend Email Sent Successfully]:", resendData)
+      }
     } catch (error) {
-      console.error("Failed to send welcome email:", error)
+      console.error("[Resend Failed to send welcome email]:", error)
     }
   }
 
@@ -64,7 +89,7 @@ export async function createCustomer(data: { full_name: string; email: string; p
   return { success: true, password } // Return password to show or email to user
 }
 
-export async function updateCustomer(customerId: string, profileId: string, data: { full_name: string; email: string; phone?: string; notes?: string }) {
+export async function updateCustomer(customerId: string, profileId: string, data: { full_name: string; email: string; phone?: string; notes?: string; address?: string; city?: string }) {
   const admin = createAdminClient()
   const supabase = await createClient()
 
@@ -88,6 +113,29 @@ export async function updateCustomer(customerId: string, profileId: string, data
     .update({ notes: data.notes || "" })
     .eq("id", customerId)
   if (customerError) throw new Error(customerError.message)
+
+  // 4. Update or Insert Address
+  if (data.address !== undefined || data.city !== undefined) {
+    const { data: existingAddr } = await supabase
+      .from("addresses")
+      .select("id")
+      .eq("customer_id", customerId)
+      .maybeSingle()
+
+    if (existingAddr) {
+      await supabase.from("addresses").update({
+        address_line_1: data.address || "",
+        city: data.city || ""
+      } as any).eq("id", existingAddr.id)
+    } else if (data.address || data.city) {
+      await supabase.from("addresses").insert({
+        customer_id: customerId,
+        address_line_1: data.address || "",
+        city: data.city || "",
+        postal_code: ""
+      } as any)
+    }
+  }
 
   revalidatePath("/dashboard/customers")
   return { success: true }
@@ -131,17 +179,23 @@ export async function createEmployee(data: { full_name: string; email: string; p
 
   if (empError) throw new Error(empError.message)
 
-  if (process.env.RESEND_API_KEY) {
+  const resend = getResendClient()
+  if (resend) {
     try {
-      const { error: resendError } = await resend.emails.send({
+      console.log(`[Resend] Sending welcome email to employee: ${data.email}`)
+      const { data: resendData, error: resendError } = await resend.emails.send({
         from: 'Pikafull <noreply@4teq.store>',
         to: data.email,
         subject: 'Welcome to Pikafull! Your Employee Account',
         html: `<p>Hello ${data.full_name},</p><p>Your employee account has been created successfully.</p><p>Your login email is: <strong>${data.email}</strong><br/>Your generated password is: <strong>${password}</strong></p><p>Please log in and change your password as soon as possible.</p>`
       })
-      if (resendError) console.error("Resend API Error:", resendError)
+      if (resendError) {
+        console.error("[Resend API Error]:", resendError)
+      } else {
+        console.log("[Resend Email Sent Successfully]:", resendData)
+      }
     } catch (error) {
-      console.error("Failed to send welcome email:", error)
+      console.error("[Resend Failed to send welcome email]:", error)
     }
   }
 

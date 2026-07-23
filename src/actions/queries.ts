@@ -112,19 +112,41 @@ export async function getAllBookings() {
   const { data, error } = await supabase
     .from("bookings")
     .select(`
-      id, status, scheduled_date, scheduled_time,
+      id, booking_number, status, scheduled_date, scheduled_time,
       base_price, extras_price, total_price,
       property_type, bedrooms, bathrooms,
-      customer_notes, created_at,
-      customers ( id, profiles ( full_name, email, phone ) ),
-      services ( name ),
-      employees ( id, profiles ( full_name ) ),
-      addresses ( address_line_1, city, postal_code )
+      customer_notes, employee_notes, created_at, employee_id,
+      customers ( id, profiles ( id, full_name, email, phone, avatar_url ) ),
+      services ( id, name, description, base_price ),
+      employees ( id, profile_id, profiles ( id, full_name, email, phone, avatar_url ) ),
+      addresses ( address_line_1, address_line_2, city, postal_code )
     `)
     .order("created_at", { ascending: false })
   if (error) throw error
   return data || []
 }
+
+export async function getBookingById(id: string) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(`
+      id, booking_number, status, scheduled_date, scheduled_time,
+      base_price, extras_price, total_price,
+      property_type, bedrooms, bathrooms, property_size_sqft,
+      customer_notes, employee_notes, created_at, employee_id,
+      customers ( id, profile_id, profiles ( id, full_name, email, phone, avatar_url ) ),
+      services ( id, name, description, duration_minutes, base_price ),
+      employees ( id, profile_id, profiles ( id, full_name, email, phone, avatar_url ) ),
+      addresses ( address_line_1, address_line_2, city, postal_code ),
+      booking_extras ( id, price, quantity, extra_services ( name ) )
+    `)
+    .eq("id", id)
+    .single()
+  if (error) return null
+  return data
+}
+
 
 export async function getAllCustomers() {
   const supabase = await createClient()
@@ -132,11 +154,39 @@ export async function getAllCustomers() {
     .from("customers")
     .select(`
       id, notes, lifetime_value, total_bookings, created_at,
-      profiles ( id, full_name, email, phone, is_active )
+      profiles ( id, full_name, email, phone, is_active ),
+      addresses ( id, address_line_1, city, postal_code )
     `)
     .order("created_at", { ascending: false })
   if (error) throw error
   return data || []
+}
+
+export async function getCurrentCustomerProfile() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data: customer } = await supabase
+    .from("customers")
+    .select(`
+      id,
+      profiles ( id, full_name, email, phone ),
+      addresses ( id, address_line_1, city, postal_code )
+    `)
+    .eq("profile_id", user.id)
+    .maybeSingle()
+
+  if (!customer) return null
+
+  const rawAddresses = (customer as any)?.addresses
+  const firstAddr = Array.isArray(rawAddresses) ? rawAddresses[0] : rawAddresses
+  return {
+    id: (customer as any).id,
+    phone: (customer as any).profiles?.phone || "",
+    addressLine1: (firstAddr as any)?.address_line_1 || "",
+    city: (firstAddr as any)?.city || "",
+  }
 }
 
 export async function getAllEmployees() {

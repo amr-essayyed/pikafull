@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createCustomer, updateCustomer } from "@/actions/admin-users"
 import {
@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { PhoneInput } from "@/components/ui/phone-input"
+import { parsePhoneWithCountryCode, validatePhoneNumber } from "@/lib/phone-validation"
 
 interface CustomerFormDialogProps {
   open: boolean
@@ -29,6 +31,13 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
 
   const isEdit = !!customer
   const profile = customer?.profiles
+  const firstAddress = Array.isArray(customer?.addresses) ? customer.addresses[0] : customer?.addresses
+
+  const [phoneValue, setPhoneValue] = useState<string>("")
+
+  useEffect(() => {
+    setPhoneValue(profile?.phone || "")
+  }, [profile?.phone])
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -37,10 +46,24 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
     setSuccessMsg("")
 
     const formData = new FormData(e.currentTarget)
+    
+    // Validate phone number if provided
+    if (phoneValue.trim()) {
+      const parsed = parsePhoneWithCountryCode(phoneValue)
+      const val = validatePhoneNumber(parsed.countryCode, parsed.number, false)
+      if (!val.isValid) {
+        setError(val.error || "Invalid phone number")
+        setLoading(false)
+        return
+      }
+    }
+
     const data = {
       full_name: formData.get("full_name") as string,
       email: formData.get("email") as string,
-      phone: formData.get("phone") as string,
+      phone: phoneValue,
+      address: formData.get("address") as string,
+      city: formData.get("city") as string,
       notes: formData.get("notes") as string,
     }
 
@@ -53,7 +76,6 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
         const res = await createCustomer(data)
         if (res.password) {
           setSuccessMsg(`Customer created successfully! Generated Password: ${res.password}`)
-          // Keep dialog open to show password, or we could close it and show a toast
         }
       }
     } catch (err: any) {
@@ -65,7 +87,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Customer" : "Add New Customer"}</DialogTitle>
           <DialogDescription>
@@ -83,7 +105,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
           </div>
         ) : (
           <form onSubmit={onSubmit} className="space-y-4">
-            {error && <div className="text-sm text-red-500 font-medium">{error}</div>}
+            {error && <div className="text-sm text-red-500 font-medium bg-red-50 dark:bg-red-950/50 p-2.5 rounded-md">{error}</div>}
             
             <div className="space-y-2">
               <Label htmlFor="full_name">Full Name *</Label>
@@ -96,12 +118,30 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input id="phone" name="phone" type="tel" defaultValue={profile?.phone} />
+              <Label htmlFor="phone">Phone Number (Optional)</Label>
+              <PhoneInput
+                id="phone"
+                name="phone"
+                value={phoneValue}
+                onChange={setPhoneValue}
+                required={false}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="address">Address (Optional)</Label>
+                <Input id="address" name="address" defaultValue={firstAddress?.address_line_1} placeholder="Street address" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="city">City (Optional)</Label>
+                <Input id="city" name="city" defaultValue={firstAddress?.city} placeholder="City name" />
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Admin Notes</Label>
+              <Label htmlFor="notes">Admin Notes (Optional)</Label>
               <Textarea id="notes" name="notes" defaultValue={customer?.notes} placeholder="Optional internal notes..." />
             </div>
 

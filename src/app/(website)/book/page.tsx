@@ -1,13 +1,18 @@
 import { BookingWizard } from "@/components/booking/booking-wizard"
-import { getServices, getExtraServices } from "@/actions/queries"
+import { getServices, getExtraServices, getCurrentCustomerProfile } from "@/actions/queries"
 import { getTranslations } from "next-intl/server"
 
 export default async function BookPage() {
   const t = await getTranslations("BookingWizard")
   let services: any[] = []
   let extras: any[] = []
+  let currentCustomer: any = null
   try {
-    ;[services, extras] = await Promise.all([getServices(), getExtraServices()])
+    ;[services, extras, currentCustomer] = await Promise.all([
+      getServices(), 
+      getExtraServices(),
+      getCurrentCustomerProfile()
+    ])
   } catch { /* fallback */ }
 
   return (
@@ -21,7 +26,11 @@ export default async function BookPage() {
       </div>
       
       <div className="max-w-4xl mx-auto">
-        <BookingWizard services={services} extras={extras} />
+        <BookingWizard 
+          services={services} 
+          extras={extras} 
+          initialCustomerData={currentCustomer}
+        />
       </div>
     </div>
   )

@@ -4,6 +4,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { getServices, getTestimonials, getCompanySettings } from "@/actions/queries"
 import { Sparkles, Star, Shield, Clock, ChevronRight, Phone } from "lucide-react"
 import { getTranslations } from "next-intl/server"
+import { BeforeAfterSlider } from "@/components/ui/before-after-slider"
+import { getServicePhotos } from "@/lib/constants/service-photos"
 
 const iconMap: Record<string, React.ReactNode> = {
   sparkles: <Sparkles className="h-6 w-6" />,
@@ -127,29 +129,48 @@ export default async function HomePage() {
               { name: "Regular Cleaning", short_description: "Standard maintenance for your home", base_price: 80, icon: "sparkles", slug: "regular" },
               { name: "Deep Cleaning", short_description: "Thorough top-to-bottom clean", base_price: 150, icon: "zap", slug: "deep" },
               { name: "End of Tenancy", short_description: "Move-out cleaning to secure your deposit", base_price: 200, icon: "home", slug: "end-of-tenancy" },
-            ]).map((service: any, i: number) => (
-              <Card key={service.slug || i} className="group hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-800 transition-all duration-300">
-                <CardContent className="p-6 space-y-4">
-                  <div className="h-12 w-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">
-                    {iconMap[service.icon] || <Sparkles className="h-6 w-6" />}
-                  </div>
+            ]).map((service: any, i: number) => {
+              const photos = getServicePhotos(service)
+              return (
+                <Card key={service.slug || i} className="group hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-800 transition-all duration-300 overflow-hidden flex flex-col justify-between">
                   <div>
-                    <h3 className="text-xl font-bold mb-1">{service.name}</h3>
-                    <p className="text-sm text-muted-foreground">{service.short_description}</p>
+                    <div className="p-2 pb-0">
+                      <BeforeAfterSlider
+                        beforeImage={photos.before}
+                        afterImage={photos.after}
+                        alt={service.name}
+                        aspectRatio="aspect-[16/10]"
+                        beforeLabel={t("before")}
+                        afterLabel={t("after")}
+                      />
+                    </div>
+                    <CardContent className="p-6 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform shrink-0">
+                          {iconMap[service.icon] || <Sparkles className="h-5 w-5" />}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold mb-0.5">{service.name}</h3>
+                          <p className="text-sm text-muted-foreground line-clamp-2">{service.short_description}</p>
+                        </div>
+                      </div>
+                    </CardContent>
                   </div>
-                  <div className="flex items-center justify-between pt-2">
-                    <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
-                      {t("fromPrice", { price: Number(service.base_price).toFixed(0) })}
-                    </span>
-                    <Button variant="ghost" size="sm" className="text-indigo-600 rtl:-translate-x-1 ltr:group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" asChild>
-                      <Link href={`/services#${service.slug}`}>
-                        {t("learnMore")} <ChevronRight className="ml-1 h-4 w-4 rtl:rotate-180" />
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  <CardContent className="px-6 pb-6 pt-0">
+                    <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                      <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
+                        {t("fromPrice", { price: Number(service.base_price).toFixed(0) })}
+                      </span>
+                      <Button variant="ghost" size="sm" className="text-indigo-600 rtl:-translate-x-1 ltr:group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" asChild>
+                        <Link href={`/services#${service.slug}`}>
+                          {t("learnMore")} <ChevronRight className="ml-1 h-4 w-4 rtl:rotate-180" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </div>
       </section>

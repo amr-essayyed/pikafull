@@ -35,12 +35,45 @@ export async function createService(data: {
   base_price: number
   duration_minutes: number
   is_active?: boolean
+  before_image_url?: string
+  after_image_url?: string
 }) {
   const supabase = await createClient()
   const { error } = await supabase.from("services").insert(data)
   if (error) throw error
   revalidatePath("/dashboard/services")
   revalidatePath("/") // revalidate public pages if needed
+}
+
+export async function uploadServicePhoto(formData: FormData): Promise<string> {
+  const file = formData.get("file") as File
+  if (!file || file.size === 0) {
+    throw new Error("No file provided")
+  }
+  const supabase = await createClient()
+  const fileExt = file.name.split('.').pop()
+  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`
+  const filePath = `photos/${fileName}`
+
+  const buffer = await file.arrayBuffer()
+  const { error } = await supabase.storage
+    .from("services")
+    .upload(filePath, buffer, {
+      contentType: file.type,
+      upsert: true,
+    })
+
+  if (error) {
+    // Fallback to base64 Data URL if storage bucket fails or isn't set up locally
+    const base64 = Buffer.from(buffer).toString('base64')
+    return `data:${file.type};base64,${base64}`
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from("services")
+    .getPublicUrl(filePath)
+
+  return publicUrlData.publicUrl
 }
 
 export async function updateService(id: string, data: any) {

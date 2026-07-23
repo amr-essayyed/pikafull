@@ -88,6 +88,29 @@ export async function createBooking(data: BookingFormData) {
     // For brevity, skipping the full DB fetch for pricing calculation here,
     // but in production, we must re-calculate based on DB values.
 
+    // 2.5 Update customer phone and address in profile if saveToProfile is enabled
+    if (data.saveToProfile !== false) {
+      const { data: custRec } = await supabase.from("customers").select("profile_id").eq("id", customerId).single()
+      const profileId = (custRec as any)?.profile_id
+      if (profileId && data.phone) {
+        await supabase.from("profiles").update({ phone: data.phone } as any).eq("id", profileId)
+      }
+
+      // Check if customer already has a primary address record to update
+      const { data: existingAddr } = await supabase
+        .from("addresses")
+        .select("id")
+        .eq("customer_id", customerId)
+        .maybeSingle()
+
+      if (existingAddr) {
+        await supabase.from("addresses").update({
+          address_line_1: data.addressLine1,
+          city: data.city,
+        } as any).eq("id", (existingAddr as any).id)
+      }
+    }
+
     // 3. Create Address
     const { data: address, error: addressError } = await supabase
       .from("addresses")
@@ -96,7 +119,7 @@ export async function createBooking(data: BookingFormData) {
         address_line_1: data.addressLine1,
         address_line_2: data.addressLine2 || "",
         city: data.city,
-        postal_code: data.postalCode,
+        postal_code: data.postalCode || "",
       } as any)
       .select()
       .single()
@@ -113,7 +136,7 @@ export async function createBooking(data: BookingFormData) {
         property_type: data.propertyType,
         bedrooms: data.bedrooms,
         bathrooms: data.bathrooms,
-        scheduled_date: data.scheduledDate.toISOString().split('T')[0],
+        scheduled_date: new Date(data.scheduledDate).toISOString().split('T')[0],
         scheduled_time: data.scheduledTime,
         // Mock prices for now, should be from calculation
         base_price: 100,
@@ -146,3 +169,121 @@ export async function createBooking(data: BookingFormData) {
     return { error: err.message }
   }
 }
+
+function parseTimeToMinutes(timeStr: string): number {
+  if (!timeStr) return 0
+  const parts = timeStr.split(":")
+  const hours = parseInt(parts[0], 10) || 0
+  const minutes = parseInt(parts[1], 10) || 0
+  return hours * 60 + minutes
+}
+
+function hasTimeOverlap(
+  timeA: string,
+  durationA: number,
+  timeB: string,
+  durationB: number
+): boolean {
+  const startA = parseTimeToMinutes(timeA)
+  const endA = startA + (durationA || 120)
+  const startB = parseTimeToMinutes(timeB)
+  const endB = startB + (durationB || 120)
+
+  return startA < endB && startB < endA
+}
+
+export async function assignEmployeeToBooking(bookingId: string, employeeId: string | null) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: "Authentication required" }
+  }
+
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+  const role = (profile as any)?.role
+  if (role !== "owner" && role !== "staff" && role !== "admin") {
+    return { error: "Not authorized to assign employees" }
+  }
+
+  const { data: currentBooking, error: fetchErr } = await supabase
+    .from("bookings")
+    .select("status, employee_id, scheduled_date, scheduled_time, estimated_duration")
+    .eq("id", bookingId)
+    .single()
+
+  if (fetchErr || !currentBooking) {
+    return { error: "Booking not found" }
+  }
+
+  // Check for time conflicts if an employee is being assigned
+  if (employeeId) {
+    const { data: existingBookings, error: conflictErr } = await supabase
+      .from("bookings")
+      .select("id, scheduled_date, scheduled_time, estimated_duration, status")
+      .eq("employee_id", employeeId)
+      .eq("scheduled_date", (currentBooking as any).scheduled_date)
+      .neq("id", bookingId)
+      .neq("status", "cancelled")
+
+    if (conflictErr) {
+      return { error: "Failed to check employee schedule availability" }
+    }
+
+    if (existingBookings && existingBookings.length > 0) {
+      const targetTime = (currentBooking as any).scheduled_time
+      const targetDuration = (currentBooking as any).estimated_duration || 120
+
+      for (const eb of existingBookings) {
+        const ebTime = (eb as any).scheduled_time
+        const ebDuration = (eb as any).estimated_duration || 120
+
+        if (hasTimeOverlap(targetTime, targetDuration, ebTime, ebDuration)) {
+          return {
+            error: `Employee is already assigned to another booking on ${(currentBooking as any).scheduled_date} at ${ebTime?.slice(0, 5)}.`
+          }
+        }
+      }
+    }
+  }
+
+  const curStatus = (currentBooking as any).status
+  let newStatus = curStatus
+  if (employeeId && curStatus === "pending") {
+    newStatus = "assigned"
+  } else if (!employeeId && curStatus === "assigned") {
+    newStatus = "pending"
+  }
+
+  const { error: updateError } = await supabase
+    .from("bookings")
+    .update({
+      employee_id: employeeId || null,
+      status: newStatus,
+    } as any)
+    .eq("id", bookingId)
+
+  if (updateError) {
+    return { error: updateError.message }
+  }
+
+  try {
+    await supabase.from("booking_history").insert({
+      booking_id: bookingId,
+      old_status: curStatus,
+      new_status: newStatus,
+      changed_by: user.id,
+      notes: employeeId ? `Assigned employee ${employeeId}` : "Unassigned employee",
+    } as any)
+  } catch (err) {
+    console.error("Failed to write booking history:", err)
+  }
+
+  revalidatePath("/dashboard")
+  revalidatePath("/dashboard/bookings")
+  revalidatePath(`/dashboard/bookings/${bookingId}`)
+
+  return { success: true, status: newStatus }
+}
+
+

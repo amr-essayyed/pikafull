@@ -11,12 +11,18 @@ export default async function NewBookingPage() {
     getAllCustomers()
   ])
 
-  // Format customers for the dropdown to make them easier to consume
-  const formattedCustomers = customers.map((c: any) => ({
-    id: c.id,
-    name: c.profiles?.full_name || "Unknown",
-    email: c.profiles?.email || "",
-  }))
+  // Format customers for the dropdown with full address and phone info
+  const formattedCustomers = customers.map((c: any) => {
+    const firstAddr = Array.isArray(c.addresses) ? c.addresses[0] : c.addresses
+    return {
+      id: c.id,
+      name: c.profiles?.full_name || "Unknown",
+      email: c.profiles?.email || "",
+      phone: c.profiles?.phone || "",
+      addressLine1: firstAddr?.address_line_1 || "",
+      city: firstAddr?.city || "",
+    }
+  })
 
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-5xl mx-auto">
