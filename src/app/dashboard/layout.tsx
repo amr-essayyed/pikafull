@@ -1,4 +1,5 @@
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar"
+import { DashboardMobileNav } from "@/components/layout/dashboard-mobile-nav"
 import { LanguageToggle } from "@/components/ui/language-toggle"
 import { useLocale } from "next-intl"
 
@@ -18,7 +19,7 @@ export default function DashboardLayout({
           <span className="text-lg font-bold">SparkleClean</span>
           <div className="flex items-center gap-2">
             <LanguageToggle currentLocale={currentLocale} />
-            <button className="p-2 border rounded-md">Menu</button>
+            <DashboardMobileNav />
           </div>
         </div>
         

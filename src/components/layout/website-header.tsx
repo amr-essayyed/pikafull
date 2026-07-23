@@ -2,9 +2,10 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/server"
 import { logout } from "@/actions/auth"
-import { LogOut, User } from "lucide-react"
+import { LogOut } from "lucide-react"
 import { LanguageToggle } from "@/components/ui/language-toggle"
 import { getLocale, getTranslations } from "next-intl/server"
+import { WebsiteMobileNav } from "@/components/layout/website-mobile-nav"
 
 export async function WebsiteHeader() {
   const supabase = await createClient()
@@ -12,10 +13,23 @@ export async function WebsiteHeader() {
   const currentLocale = await getLocale()
   const t = await getTranslations("Navigation")
   
-  let role = null
+  let role: string | null = null
   if (user) {
     const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    role = data?.role
+    role = (data as any)?.role || null
+  }
+
+  const navTranslations = {
+    services: t('services'),
+    pricing: t('pricing'),
+    about: t('about'),
+    reviews: t('reviews'),
+    dashboard: t('dashboard'),
+    mySchedule: t('mySchedule'),
+    myBookings: t('myBookings'),
+    logout: t('logout'),
+    login: t('login'),
+    bookNow: t('bookNow'),
   }
 
   return (
@@ -72,9 +86,7 @@ export async function WebsiteHeader() {
               </>
             )}
           </div>
-          <Button variant="outline" size="icon" className="md:hidden">
-            <span className="sr-only">Toggle Menu</span>
-          </Button>
+          <WebsiteMobileNav isLoggedIn={!!user} role={role} t={navTranslations} />
         </div>
       </div>
     </header>
