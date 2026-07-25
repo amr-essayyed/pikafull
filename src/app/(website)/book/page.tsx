@@ -4,8 +4,9 @@ import { getTranslations } from "next-intl/server"
 
 import { createClient } from "@/lib/supabase/server"
 
-export default async function BookPage() {
+export default async function BookPage({ searchParams }: { searchParams: Promise<{ service?: string }> }) {
   const t = await getTranslations("BookingWizard")
+  const { service: initialServiceId } = await searchParams
   let services: any[] = []
   let extras: any[] = []
   let currentCustomer: any = null
@@ -39,6 +40,7 @@ export default async function BookPage() {
           extras={extras} 
           initialCustomerData={currentCustomer}
           isAuthenticated={isAuthenticated}
+          initialServiceId={initialServiceId}
         />
       </div>
     </div>

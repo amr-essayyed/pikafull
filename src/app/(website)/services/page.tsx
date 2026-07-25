@@ -140,7 +140,7 @@ export default async function ServicesPage() {
                       £{Number(service.base_price).toFixed(0)}
                     </p>
                     <Button className="bg-indigo-600 hover:bg-indigo-700 w-full shadow-md hover:shadow-indigo-500/20" asChild>
-                      <Link href="/book">
+                      <Link href={`/book?service=${service.id}`}>
                         {t('bookNowBtn')} <ChevronRight className="ml-1 h-4 w-4 rtl:rotate-180" />
                       </Link>
                     </Button>

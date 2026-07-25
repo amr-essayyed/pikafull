@@ -161,11 +161,18 @@ export default async function HomePage() {
                       <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
                         {t("fromPrice", { price: Number(service.base_price).toFixed(0) })}
                       </span>
-                      <Button variant="ghost" size="sm" className="text-indigo-600 rtl:-translate-x-1 ltr:group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" asChild>
-                        <Link href={`/services#${service.slug}`}>
-                          {t("learnMore")} <ChevronRight className="ml-1 h-4 w-4 rtl:rotate-180" />
-                        </Link>
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" className="text-indigo-600" asChild>
+                          <Link href={`/services#${service.slug}`}>
+                            {t("learnMore")}
+                          </Link>
+                        </Button>
+                        <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" asChild>
+                          <Link href={`/book?service=${service.id}`}>
+                            {t("bookNow")} <ChevronRight className="ml-1 h-3.5 w-3.5 rtl:rotate-180" />
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

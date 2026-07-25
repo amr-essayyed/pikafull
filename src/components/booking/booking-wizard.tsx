@@ -36,6 +36,7 @@ interface BookingWizardProps {
   customers?: any[]
   isAdmin?: boolean
   isAuthenticated?: boolean
+  initialServiceId?: string
   initialCustomerData?: {
     phone?: string
     addressLine1?: string
@@ -49,6 +50,7 @@ export function BookingWizard({
   customers = [],
   isAdmin = false,
   isAuthenticated = true,
+  initialServiceId,
   initialCustomerData,
 }: BookingWizardProps) {
   const t = useTranslations("BookingWizard")
@@ -66,7 +68,7 @@ export function BookingWizard({
       customerId: "",
       fullName: "",
       email: "",
-      serviceId: "",
+      serviceId: initialServiceId || "",
       propertyType: "apartment",
       bedrooms: 1,
       bathrooms: 1,
@@ -91,6 +93,18 @@ export function BookingWizard({
     }
   }, [initialCustomerData, form])
 
+  // Auto-advance past service selection if a service was pre-selected via URL
+  React.useEffect(() => {
+    if (initialServiceId && !isAdmin && currentStep === 0) {
+      // Verify the service exists in the available list before advancing
+      const svcExists = services.some((s: any) => s.id === initialServiceId)
+      if (svcExists) {
+        setCurrentStep(1)
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Run only on mount
+
   // Restore form draft from sessionStorage on mount (if guest or user returning)
   React.useEffect(() => {
     if (typeof window !== "undefined" && !isAdmin) {
@@ -100,7 +114,7 @@ export function BookingWizard({
           const draft = JSON.parse(saved)
           if (draft.fullName) form.setValue("fullName", draft.fullName)
           if (draft.email) form.setValue("email", draft.email)
-          if (draft.serviceId) form.setValue("serviceId", draft.serviceId)
+          if (draft.serviceId && !initialServiceId) form.setValue("serviceId", draft.serviceId)
           if (draft.propertyType) form.setValue("propertyType", draft.propertyType)
           if (typeof draft.bedrooms === "number") form.setValue("bedrooms", draft.bedrooms)
           if (typeof draft.bathrooms === "number") form.setValue("bathrooms", draft.bathrooms)
@@ -110,7 +124,7 @@ export function BookingWizard({
           if (draft.addressLine1 && !initialCustomerData?.addressLine1) form.setValue("addressLine1", draft.addressLine1)
           if (draft.city && !initialCustomerData?.city) form.setValue("city", draft.city)
           if (draft.phone && !initialCustomerData?.phone) form.setValue("phone", draft.phone)
-          if (typeof draft.currentStep === "number" && draft.currentStep >= 0 && draft.currentStep < 4) {
+          if (typeof draft.currentStep === "number" && draft.currentStep >= 0 && draft.currentStep < 4 && !initialServiceId) {
             setCurrentStep(draft.currentStep)
           }
         }
