@@ -27,6 +27,7 @@ export async function WebsiteHeader() {
     dashboard: t('dashboard'),
     mySchedule: t('mySchedule'),
     myBookings: t('myBookings'),
+    myProfile: t('myProfile'),
     logout: t('logout'),
     login: t('login'),
     bookNow: t('bookNow'),
@@ -64,10 +65,18 @@ export async function WebsiteHeader() {
                   </Button>
                 )}
                 {role === "customer" && (
-                  <Button variant="ghost" asChild>
-                    <Link href="/customer/dashboard">{t('myBookings')}</Link>
-                  </Button>
+                  <>
+                    <Button variant="ghost" asChild>
+                      <Link href="/customer/dashboard">{t('myBookings')}</Link>
+                    </Button>
+                    <Button variant="ghost" asChild>
+                      <Link href="/customer/profile">{t('myProfile')}</Link>
+                    </Button>
+                  </>
                 )}
+                <Button asChild className="bg-indigo-600 hover:bg-indigo-700 font-semibold shadow-sm">
+                  <Link href="/book">{t('bookNow')}</Link>
+                </Button>
                 <form action={logout}>
                   <Button variant="outline" type="submit">
                     <LogOut className="mr-2 h-4 w-4 rtl:ml-2 rtl:mr-0" />
@@ -80,7 +89,7 @@ export async function WebsiteHeader() {
                 <Button variant="ghost" asChild>
                   <Link href="/login">{t('login')}</Link>
                 </Button>
-                <Button asChild className="bg-indigo-600 hover:bg-indigo-700">
+                <Button asChild className="bg-indigo-600 hover:bg-indigo-700 font-semibold shadow-sm">
                   <Link href="/book">{t('bookNow')}</Link>
                 </Button>
               </>

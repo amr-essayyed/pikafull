@@ -20,9 +20,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-export default function LoginPage() {
+import { useSearchParams } from "next/navigation"
+
+function LoginForm() {
   const tAuth = useTranslations("Auth")
   const tCommon = useTranslations("Common")
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get("redirectTo")
+
   const [error, setError] = React.useState<string | null>(null)
   const [isPending, startTransition] = React.useTransition()
 
@@ -40,6 +45,9 @@ export default function LoginPage() {
       const formData = new FormData()
       formData.append("email", values.email)
       formData.append("password", values.password)
+      if (redirectTo) {
+        formData.append("redirectTo", redirectTo)
+      }
       
       const result = await login(formData)
       if (result?.error) {
@@ -112,12 +120,20 @@ export default function LoginPage() {
       <p className="mt-8 text-center text-sm text-slate-600 dark:text-slate-400">
         {tAuth('noAccount')}{" "}
         <Link
-          href="/register"
+          href={redirectTo ? `/register?redirectTo=${encodeURIComponent(redirectTo)}` : "/register"}
           className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
         >
           {tAuth('signupLink')}
         </Link>
       </p>
     </>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <React.Suspense fallback={<div className="text-center py-8">Loading...</div>}>
+      <LoginForm />
+    </React.Suspense>
   )
 }

@@ -24,6 +24,7 @@ interface WebsiteMobileNavProps {
     dashboard: string
     mySchedule: string
     myBookings: string
+    myProfile?: string
     logout: string
     login: string
     bookNow: string
@@ -88,6 +89,9 @@ export function WebsiteMobileNav({ isLoggedIn, role, t }: WebsiteMobileNavProps)
         </div>
 
         <div className="flex flex-col gap-3 pt-6 border-t border-border">
+          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 font-semibold" asChild onClick={handleLinkClick}>
+            <Link href="/book">{t.bookNow}</Link>
+          </Button>
           {isLoggedIn ? (
             <>
               {(role === "owner" || role === "staff") && (
@@ -101,26 +105,26 @@ export function WebsiteMobileNav({ isLoggedIn, role, t }: WebsiteMobileNavProps)
                 </Button>
               )}
               {role === "customer" && (
-                <Button variant="outline" className="w-full justify-start" asChild onClick={handleLinkClick}>
-                  <Link href="/customer/dashboard">{t.myBookings}</Link>
-                </Button>
+                <>
+                  <Button variant="outline" className="w-full justify-start" asChild onClick={handleLinkClick}>
+                    <Link href="/customer/dashboard">{t.myBookings}</Link>
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start" asChild onClick={handleLinkClick}>
+                    <Link href="/customer/profile">{t.myProfile || "My Profile"}</Link>
+                  </Button>
+                </>
               )}
               <form action={logout} className="w-full">
-                <Button variant="destructive" type="submit" className="w-full justify-start">
+                <Button variant="outline" type="submit" className="w-full justify-start text-red-600 hover:text-red-700 dark:text-red-400">
                   <LogOut className="mr-2 h-4 w-4 rtl:ml-2 rtl:mr-0" />
                   {t.logout}
                 </Button>
               </form>
             </>
           ) : (
-            <>
-              <Button variant="outline" className="w-full" asChild onClick={handleLinkClick}>
-                <Link href="/login">{t.login}</Link>
-              </Button>
-              <Button className="w-full bg-indigo-600 hover:bg-indigo-700" asChild onClick={handleLinkClick}>
-                <Link href="/book">{t.bookNow}</Link>
-              </Button>
-            </>
+            <Button variant="outline" className="w-full" asChild onClick={handleLinkClick}>
+              <Link href="/login">{t.login}</Link>
+            </Button>
           )}
         </div>
       </SheetContent>

@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { CalendarDays, MapPin, Clock, CheckCircle } from "lucide-react"
+import Link from "next/link"
+import { CalendarDays, MapPin, Clock, User, Plus } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { getTranslations } from "next-intl/server"
 
 const statusColors: Record<string, string> = {
@@ -17,6 +19,7 @@ const statusColors: Record<string, string> = {
 
 export default async function CustomerDashboardPage() {
   const t = await getTranslations("CustomerDashboard")
+  const tNav = await getTranslations("Navigation")
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -41,7 +44,7 @@ export default async function CustomerDashboardPage() {
         services(name),
         addresses(address_line_1, city)
       `)
-      .eq("customer_id", customer.id)
+      .eq("customer_id", (customer as any).id)
       .order("created_at", { ascending: false })
       
     if (data) {
@@ -50,10 +53,36 @@ export default async function CustomerDashboardPage() {
   }
 
   return (
-    <div className="container py-12 md:py-16 max-w-5xl mx-auto px-4">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold tracking-tight mb-2">{t('myDashboard')}</h1>
-        <p className="text-lg text-slate-600 dark:text-slate-400">{t('dashboardDesc')}</p>
+    <div className="container py-8 md:py-12 max-w-5xl mx-auto px-4">
+      {/* Sub-Header Navigation Tabs */}
+      <div className="flex items-center gap-4 mb-8 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <Link
+          href="/customer/dashboard"
+          className="inline-flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-semibold text-sm bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/50 px-3.5 py-1.5 rounded-lg shadow-sm"
+        >
+          <CalendarDays className="w-4 h-4" />
+          {tNav("myBookings")}
+        </Link>
+        <Link
+          href="/customer/profile"
+          className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 font-medium text-sm transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60"
+        >
+          <User className="w-4 h-4" />
+          {tNav("myProfile")}
+        </Link>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight mb-2">{t('myDashboard')}</h1>
+          <p className="text-slate-600 dark:text-slate-400">{t('dashboardDesc')}</p>
+        </div>
+        <Button asChild className="bg-indigo-600 hover:bg-indigo-700 font-semibold shadow-md shrink-0">
+          <Link href="/book" className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            <span>{tNav('bookNow')}</span>
+          </Link>
+        </Button>
       </div>
 
       <div className="space-y-6">

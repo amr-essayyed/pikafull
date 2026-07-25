@@ -33,6 +33,8 @@ export async function login(formData: FormData) {
 
   revalidatePath("/", "layout")
 
+  const redirectTo = (formData.get("redirectTo") as string) || null
+
   // @ts-expect-error Typescript infers profile as never if DB types aren't fully generated
   const role = profile?.role
   if (role === "owner" || role === "staff") {
@@ -40,7 +42,7 @@ export async function login(formData: FormData) {
   } else if (role === "employee") {
     redirect("/employee/my-schedule")
   } else {
-    redirect("/")
+    redirect(redirectTo && redirectTo.startsWith("/") ? redirectTo : "/")
   }
 }
 
@@ -107,8 +109,10 @@ export async function register(formData: FormData) {
     return { error: error.message || JSON.stringify(error) }
   }
 
+  const redirectTo = (formData.get("redirectTo") as string) || null
+
   revalidatePath("/", "layout")
-  redirect("/")
+  redirect(redirectTo && redirectTo.startsWith("/") ? redirectTo : "/")
 }
 
 export async function logout() {

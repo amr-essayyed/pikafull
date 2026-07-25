@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { bookingSchema, type BookingFormData } from "@/validators/booking"
-import { calculatePricing } from "@/lib/pricing"
+import { Resend } from "resend"
 
 export async function createBooking(data: BookingFormData) {
   const result = bookingSchema.safeParse(data)
@@ -13,23 +14,73 @@ export async function createBooking(data: BookingFormData) {
   }
 
   const supabase = await createClient()
+  const admin = createAdminClient()
 
-  // 1. Get current user (must be authenticated or handled via public flow)
-  // For the public flow, if the user is not authenticated, we would need to 
-  // either create an account or link to a guest customer profile.
-  // Assuming authenticated customer for now to match the RLS.
+  // 1. Get current user or handle guest auto-registration
   const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    return { error: "You must be logged in to book." }
+  let activeUserId: string | null = user?.id || null
+
+  if (!activeUserId) {
+    if (!data.fullName || !data.email) {
+      return { error: "Please enter your full name and email address to complete your booking." }
+    }
+
+    const generatedPassword = crypto.randomUUID().replace(/-/g, '') + '!A1'
+
+    // Create user via Admin API (bypasses RLS & confirms email immediately)
+    const { data: userData, error: userError } = await admin.auth.admin.createUser({
+      email: data.email,
+      password: generatedPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: data.fullName,
+        role: "customer",
+      },
+    })
+
+    if (userError || !userData?.user) {
+      const msg = userError?.message || ""
+      if (msg.includes("already registered") || msg.includes("already exists")) {
+        return { error: "An account with this email already exists. Please sign in to complete your booking." }
+      }
+      return { error: userError?.message || "Failed to create customer account." }
+    }
+
+    activeUserId = userData.user.id
+
+    // Sign the new user in on the client cookies so their session is active
+    try {
+      await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: generatedPassword,
+      })
+    } catch (authErr) {
+      console.warn("Auto sign-in warning:", authErr)
+    }
+
+    // Send welcome email with generated password via Resend
+    try {
+      const apiKey = process.env.RESEND_API_KEY
+      if (apiKey) {
+        const resend = new Resend(apiKey)
+        await resend.emails.send({
+          from: 'Pikafull <noreply@4teq.store>',
+          to: data.email,
+          subject: 'Welcome to Pikafull! Your Account & Booking Details',
+          html: `<p>Hello ${data.fullName},</p><p>Thank you for booking with Pikafull!</p><p>An account has been automatically created for you to track your booking.</p><p>Your login email is: <strong>${data.email}</strong><br/>Your generated password is: <strong>${generatedPassword}</strong></p><p>Please log in and change your password as soon as possible.</p>`
+        })
+      }
+    } catch (emailErr) {
+      console.error("[Resend] Failed to send welcome email:", emailErr)
+    }
   }
 
-  // 2. Get customer profile id
+  // 2. Get or create customer profile id using admin client (bypassing RLS)
   let customerId: string
   
   if (data.customerId) {
     // Admin/Staff booking for a specific customer
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+    const { data: profile } = await admin.from("profiles").select("role").eq("id", activeUserId).single()
     // @ts-expect-error Typescript infers profile as never if DB types aren't fully generated
     if (profile?.role === "owner" || profile?.role === "staff" || profile?.role === "admin") {
       customerId = data.customerId
@@ -37,74 +88,52 @@ export async function createBooking(data: BookingFormData) {
       return { error: "You are not authorized to create bookings for other customers." }
     }
   } else {
-    const { data: customer, error: customerError } = await supabase
+    // Ensure profile row exists & update phone
+    await admin.from("profiles").upsert({
+      id: activeUserId,
+      email: data.email || user?.email,
+      full_name: data.fullName || user?.user_metadata?.full_name || "",
+      phone: data.phone || null,
+      role: "customer",
+    } as any)
+
+    const { data: existingCust } = await admin
       .from("customers")
       .select("id")
-      .eq("profile_id", user.id)
-      .single()
+      .eq("profile_id", activeUserId)
+      .maybeSingle()
 
-    if (customerError || !customer) {
-      // Try to create the customer profile on the fly
-      const { data: newCustomer, error: insertError } = await supabase
+    if (existingCust) {
+      customerId = (existingCust as any).id
+    } else {
+      const { data: newCustomer, error: insertError } = await admin
         .from("customers")
-        .insert({ profile_id: user.id } as any)
+        .insert({ profile_id: activeUserId } as any)
         .select("id")
         .single()
 
       if (insertError || !newCustomer) {
         console.error("Failed to create customer profile:", insertError);
-        // Attempt to upsert the profile just in case the trigger failed earlier
-        await supabase.from("profiles").upsert({
-          id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.full_name || "",
-          role: "customer"
-        } as any);
-        // Try creating customer again
-        const { data: retryCustomer, error: retryError } = await supabase
-          .from("customers")
-          .insert({ profile_id: user.id } as any)
-          .select("id")
-          .single();
-          
-        if (retryError || !retryCustomer) {
-          console.error("Retry failed:", retryError);
-          return { error: "Customer profile not found and could not be created. Error: " + (retryError?.message || "Unknown") }
-        }
-        // @ts-expect-error
-        customerId = retryCustomer.id;
-      } else {
-        // @ts-expect-error
-        customerId = newCustomer.id
+        return { error: "Failed to create customer profile: " + (insertError?.message || "Unknown error") }
       }
-    } else {
-      // @ts-expect-error
-      customerId = customer.id
+      customerId = (newCustomer as any).id
     }
   }
 
   try {
-    // We would calculate pricing server-side here as well to prevent tampering
-    // For brevity, skipping the full DB fetch for pricing calculation here,
-    // but in production, we must re-calculate based on DB values.
-
-    // 2.5 Update customer phone and address in profile if saveToProfile is enabled
     if (data.saveToProfile !== false) {
-      const { data: custRec } = await supabase.from("customers").select("profile_id").eq("id", customerId).single()
-      const profileId = (custRec as any)?.profile_id
-      if (profileId && data.phone) {
-        await supabase.from("profiles").update({ phone: data.phone } as any).eq("id", profileId)
+      if (data.phone) {
+        await admin.from("profiles").update({ phone: data.phone } as any).eq("id", activeUserId)
       }
 
-      // Check if customer already has a primary address record to update
-      const { data: existingAddr } = await supabase
+      const { data: existingAddr } = await admin
         .from("addresses")
         .select("id")
         .eq("customer_id", customerId)
         .maybeSingle()
 
       if (existingAddr) {
-        await supabase.from("addresses").update({
+        await admin.from("addresses").update({
           address_line_1: data.addressLine1,
           city: data.city,
         } as any).eq("id", (existingAddr as any).id)
@@ -112,7 +141,7 @@ export async function createBooking(data: BookingFormData) {
     }
 
     // 3. Create Address
-    const { data: address, error: addressError } = await supabase
+    const { data: address, error: addressError } = await admin
       .from("addresses")
       .insert({
         customer_id: customerId,
@@ -124,10 +153,17 @@ export async function createBooking(data: BookingFormData) {
       .select()
       .single()
 
-    if (addressError) throw new Error("Failed to save address")
+    if (addressError) throw new Error("Failed to save address: " + addressError.message)
 
-    // 4. Create Booking
-    const { data: booking, error: bookingError } = await supabase
+    // 4. Check Timeslot Availability
+    const scheduledDateStr = new Date(data.scheduledDate).toISOString().split('T')[0]
+    const unavailableSlots = await getUnavailableTimeslots(scheduledDateStr)
+    if (unavailableSlots.includes(data.scheduledTime)) {
+      return { error: "The selected timeslot is no longer available because all employees are busy at that time. Please choose another timeslot." }
+    }
+
+    // 5. Create Booking
+    const { data: booking, error: bookingError } = await admin
       .from("bookings")
       .insert({
         customer_id: customerId,
@@ -136,9 +172,8 @@ export async function createBooking(data: BookingFormData) {
         property_type: data.propertyType,
         bedrooms: data.bedrooms,
         bathrooms: data.bathrooms,
-        scheduled_date: new Date(data.scheduledDate).toISOString().split('T')[0],
+        scheduled_date: scheduledDateStr,
         scheduled_time: data.scheduledTime,
-        // Mock prices for now, should be from calculation
         base_price: 100,
         extras_price: 0,
         total_price: 100,
@@ -150,23 +185,24 @@ export async function createBooking(data: BookingFormData) {
 
     if (bookingError) throw new Error("Failed to create booking: " + bookingError.message)
 
-    // 5. Create Booking Extras
-    if (data.extras.length > 0) {
+    // 6. Create Booking Extras
+    if (data.extras && data.extras.length > 0) {
       const extrasToInsert = data.extras.map(extraId => ({
         booking_id: (booking as any).id,
         extra_service_id: extraId,
         quantity: 1,
-        price: 0 // Mock price
+        price: 0
       }))
-      
-      await supabase.from("booking_extras").insert(extrasToInsert as any)
+
+      await admin.from("booking_extras").insert(extrasToInsert as any)
     }
 
-    revalidatePath("/dashboard")
+    revalidatePath("/customer/dashboard")
+    revalidatePath("/dashboard/bookings")
     return { success: true, bookingId: (booking as any).id }
-    
   } catch (err: any) {
-    return { error: err.message }
+    console.error("Booking creation failed:", err)
+    return { error: err.message || "An unexpected error occurred while placing your booking." }
   }
 }
 
@@ -190,6 +226,80 @@ function hasTimeOverlap(
   const endB = startB + (durationB || 120)
 
   return startA < endB && startB < endA
+}
+
+export async function getUnavailableTimeslots(dateStr: string): Promise<string[]> {
+  if (!dateStr) return []
+
+  const admin = createAdminClient()
+  const formattedDate = dateStr.includes("T") ? dateStr.split("T")[0] : dateStr
+
+  // 1. Fetch available/active employees
+  const { data: employees, error: empErr } = await admin
+    .from("employees")
+    .select("id, is_available, profiles!inner(is_active)")
+
+  if (empErr) {
+    console.error("Failed to fetch employees for timeslot availability:", empErr)
+    return []
+  }
+
+  // Filter employees who are available and have active profiles
+  const activeEmployees = (employees || []).filter((e: any) => {
+    const isAvail = e.is_available !== false
+    const isActive = e.profiles?.is_active !== false
+    return isAvail && isActive
+  })
+
+  const totalEmployeesCount = activeEmployees.length
+  const activeEmployeeIds = new Set(activeEmployees.map((e: any) => e.id))
+
+  const standardTimeslots = ["08:00", "10:00", "12:00", "14:00", "16:00"]
+
+  // If there are 0 active employees, all timeslots are unavailable
+  if (totalEmployeesCount === 0) {
+    return standardTimeslots
+  }
+
+  // 2. Fetch non-cancelled bookings for the specified date
+  const { data: bookings, error: bookErr } = await admin
+    .from("bookings")
+    .select("id, employee_id, scheduled_time, estimated_duration, status")
+    .eq("scheduled_date", formattedDate)
+    .neq("status", "cancelled")
+
+  if (bookErr || !bookings) {
+    if (bookErr) console.error("Failed to fetch bookings for availability:", bookErr)
+    return []
+  }
+
+  const unavailable: string[] = []
+
+  for (const slot of standardTimeslots) {
+    const slotDuration = 120
+    const assignedBusy = new Set<string>()
+    let unassignedCount = 0
+
+    for (const b of (bookings as any[])) {
+      if (!b.scheduled_time) continue
+      const bDuration = b.estimated_duration || 120
+
+      if (hasTimeOverlap(slot, slotDuration, b.scheduled_time, bDuration)) {
+        if (b.employee_id && activeEmployeeIds.has(b.employee_id)) {
+          assignedBusy.add(b.employee_id)
+        } else {
+          unassignedCount++
+        }
+      }
+    }
+
+    const occupiedCount = assignedBusy.size + unassignedCount
+    if (occupiedCount >= totalEmployeesCount) {
+      unavailable.push(slot)
+    }
+  }
+
+  return unavailable
 }
 
 export async function assignEmployeeToBooking(bookingId: string, employeeId: string | null) {

@@ -15,6 +15,15 @@ export function WebsiteFooter() {
             <p className="text-sm text-slate-500 dark:text-slate-400">
               {t('description')}
             </p>
+            <div>
+              <Link
+                href="/book"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+              >
+                <span>Book Service Now</span>
+                <span className="rtl:rotate-180">→</span>
+              </Link>
+            </div>
           </div>
           <div>
             <h3 className="font-semibold mb-4">{t('servicesTitle')}</h3>

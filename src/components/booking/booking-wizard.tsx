@@ -27,7 +27,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { PhoneInput } from "@/components/ui/phone-input"
 import { bookingSchema, type BookingFormData } from "@/validators/booking"
-import { createBooking } from "@/actions/bookings"
+import { createBooking, getUnavailableTimeslots } from "@/actions/bookings"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface BookingWizardProps {
@@ -35,6 +35,7 @@ interface BookingWizardProps {
   extras?: any[]
   customers?: any[]
   isAdmin?: boolean
+  isAuthenticated?: boolean
   initialCustomerData?: {
     phone?: string
     addressLine1?: string
@@ -47,6 +48,7 @@ export function BookingWizard({
   extras = [],
   customers = [],
   isAdmin = false,
+  isAuthenticated = true,
   initialCustomerData,
 }: BookingWizardProps) {
   const t = useTranslations("BookingWizard")
@@ -55,11 +57,15 @@ export function BookingWizard({
   const [isPending, startTransition] = React.useTransition()
   const [isSuccess, setIsSuccess] = React.useState(false)
   const [datePopoverOpen, setDatePopoverOpen] = React.useState(false)
+  const [unavailableTimeslots, setUnavailableTimeslots] = React.useState<string[]>([])
+  const [isLoadingSlots, setIsLoadingSlots] = React.useState<boolean>(false)
 
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema) as any,
     defaultValues: {
       customerId: "",
+      fullName: "",
+      email: "",
       serviceId: "",
       propertyType: "apartment",
       bedrooms: 1,
@@ -84,6 +90,79 @@ export function BookingWizard({
       if (initialCustomerData.phone) form.setValue("phone", initialCustomerData.phone)
     }
   }, [initialCustomerData, form])
+
+  // Restore form draft from sessionStorage on mount (if guest or user returning)
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && !isAdmin) {
+      try {
+        const saved = sessionStorage.getItem("pikafull_booking_draft")
+        if (saved) {
+          const draft = JSON.parse(saved)
+          if (draft.fullName) form.setValue("fullName", draft.fullName)
+          if (draft.email) form.setValue("email", draft.email)
+          if (draft.serviceId) form.setValue("serviceId", draft.serviceId)
+          if (draft.propertyType) form.setValue("propertyType", draft.propertyType)
+          if (typeof draft.bedrooms === "number") form.setValue("bedrooms", draft.bedrooms)
+          if (typeof draft.bathrooms === "number") form.setValue("bathrooms", draft.bathrooms)
+          if (Array.isArray(draft.extras)) form.setValue("extras", draft.extras)
+          if (draft.scheduledDate) form.setValue("scheduledDate", new Date(draft.scheduledDate))
+          if (draft.scheduledTime) form.setValue("scheduledTime", draft.scheduledTime)
+          if (draft.addressLine1 && !initialCustomerData?.addressLine1) form.setValue("addressLine1", draft.addressLine1)
+          if (draft.city && !initialCustomerData?.city) form.setValue("city", draft.city)
+          if (draft.phone && !initialCustomerData?.phone) form.setValue("phone", draft.phone)
+          if (typeof draft.currentStep === "number" && draft.currentStep >= 0 && draft.currentStep < 4) {
+            setCurrentStep(draft.currentStep)
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore booking draft:", e)
+      }
+    }
+  }, [isAdmin, form, initialCustomerData])
+
+  // Save form draft to sessionStorage on change
+  const watchAllFields = form.watch()
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && !isAdmin) {
+      try {
+        const draft = {
+          ...watchAllFields,
+          currentStep,
+        }
+        sessionStorage.setItem("pikafull_booking_draft", JSON.stringify(draft))
+      } catch (e) {
+        console.error("Failed to save booking draft:", e)
+      }
+    }
+  }, [watchAllFields, currentStep, isAdmin])
+
+  // Fetch unavailable timeslots whenever scheduledDate changes
+  const watchedDate = form.watch("scheduledDate")
+  React.useEffect(() => {
+    if (watchedDate) {
+      const d = new Date(watchedDate)
+      if (!isNaN(d.getTime())) {
+        const dateStr = format(d, "yyyy-MM-dd")
+        setIsLoadingSlots(true)
+        getUnavailableTimeslots(dateStr)
+          .then((slots) => {
+            setUnavailableTimeslots(slots)
+            const currentSlot = form.getValues("scheduledTime")
+            if (currentSlot && slots.includes(currentSlot)) {
+              form.setValue("scheduledTime", "")
+            }
+          })
+          .catch((err) => {
+            console.error("Failed to check timeslots availability:", err)
+          })
+          .finally(() => {
+            setIsLoadingSlots(false)
+          })
+      }
+    } else {
+      setUnavailableTimeslots([])
+    }
+  }, [watchedDate, form])
 
   // Handle admin customer selection to auto-fill address/city/phone
   const handleCustomerChange = (selectedId: string) => {
@@ -123,6 +202,9 @@ export function BookingWizard({
       if (result?.error) {
         setError(result.error)
       } else {
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("pikafull_booking_draft")
+        }
         setIsSuccess(true)
       }
     })
@@ -159,7 +241,9 @@ export function BookingWizard({
       case "Date & Time":
         return ["scheduledDate", "scheduledTime"]
       case "Address & Payment":
-        return ["addressLine1", "city", "phone", "paymentMethod"]
+        return isAuthenticated
+          ? ["addressLine1", "city", "phone", "paymentMethod"]
+          : ["fullName", "email", "addressLine1", "city", "phone", "paymentMethod"]
       default:
         return []
     }
@@ -186,6 +270,26 @@ export function BookingWizard({
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border shadow-sm overflow-hidden">
+      {!isAuthenticated && !isAdmin && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900/60 p-4 px-6 flex items-center justify-between gap-3 text-amber-900 dark:text-amber-200 text-xs sm:text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-base">💡</span>
+            <span>
+              <strong>Booking as Guest:</strong> Your customer account will be created automatically when you confirm your booking.
+            </span>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900 text-xs shrink-0"
+            onClick={() => window.location.href = "/login?redirectTo=/book"}
+          >
+            Sign In Instead
+          </Button>
+        </div>
+      )}
+
       {/* Progress Bar */}
       <nav aria-label="Progress">
         <ol role="list" className="space-y-4 md:flex md:space-y-0 md:space-x-8 p-6 bg-slate-50 dark:bg-slate-950 border-b">
@@ -401,13 +505,30 @@ export function BookingWizard({
                           <select
                             className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             {...field}
+                            disabled={!watchedDate || isLoadingSlots}
                           >
-                            <option value="">{t('selectTime')}</option>
-                            <option value="08:00">08:00 AM</option>
-                            <option value="10:00">10:00 AM</option>
-                            <option value="12:00">12:00 PM</option>
-                            <option value="14:00">02:00 PM</option>
-                            <option value="16:00">04:00 PM</option>
+                            <option value="">
+                              {!watchedDate
+                                ? t('selectDateFirst')
+                                : isLoadingSlots
+                                ? t('checkingAvailability')
+                                : unavailableTimeslots.length >= 5
+                                ? t('noTimeslotsAvailable')
+                                : t('selectTime')}
+                            </option>
+                            {[
+                              { value: "08:00", label: "08:00 AM" },
+                              { value: "10:00", label: "10:00 AM" },
+                              { value: "12:00", label: "12:00 PM" },
+                              { value: "14:00", label: "02:00 PM" },
+                              { value: "16:00", label: "04:00 PM" },
+                            ]
+                              .filter((slot) => !unavailableTimeslots.includes(slot.value))
+                              .map((slot) => (
+                                <option key={slot.value} value={slot.value}>
+                                  {slot.label}
+                                </option>
+                              ))}
                           </select>
                         </FormControl>
                         <FormMessage />
@@ -421,6 +542,51 @@ export function BookingWizard({
             {/* Step 4: Address & Payment */}
             {wizardSteps[currentStep].internalName === "Address & Payment" && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                {!isAuthenticated && (
+                  <div className="space-y-4 border-b pb-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-lg">Contact & Account Details</h3>
+                      <span className="text-xs text-muted-foreground">Auto account creation</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="fullName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Full Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="John Doe" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email Address</FormLabel>
+                            <FormControl>
+                              <Input type="email" placeholder="john@example.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 rounded-lg p-3.5 flex items-start gap-2.5 text-xs text-indigo-900 dark:text-indigo-200">
+                      <span className="text-base leading-none">💡</span>
+                      <div>
+                        <strong>Automatic Account Creation:</strong> A customer account will be created automatically for this email. We will email your login password to you upon confirmation.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-4">
                   <h3 className="font-semibold text-lg border-b pb-2">{t('serviceAddress')}</h3>
                   <FormField
@@ -472,30 +638,32 @@ export function BookingWizard({
                   </div>
 
                   {/* Option to save address & phone as default in customer profile */}
-                  <FormField
-                    control={form.control}
-                    name="saveToProfile"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-4 bg-slate-50 dark:bg-slate-950/60 mt-4">
-                        <FormControl>
-                          <input
-                            type="checkbox"
-                            checked={field.value}
-                            onChange={field.onChange}
-                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 mt-0.5 cursor-pointer"
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel className="font-semibold text-sm cursor-pointer">
-                            {t('saveToProfile')}
-                          </FormLabel>
-                          <FormDescription className="text-xs text-muted-foreground">
-                            {t('saveToProfileDesc')}
-                          </FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
+                  {isAuthenticated && (
+                    <FormField
+                      control={form.control}
+                      name="saveToProfile"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-4 bg-slate-50 dark:bg-slate-950/60 mt-4">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 mt-0.5 cursor-pointer"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="font-semibold text-sm cursor-pointer">
+                              {t('saveToProfile')}
+                            </FormLabel>
+                            <FormDescription className="text-xs text-muted-foreground">
+                              {t('saveToProfileDesc')}
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
               </div>
             )}
@@ -514,7 +682,7 @@ export function BookingWizard({
                 type="button" 
                 onClick={next}
                 disabled={isPending}
-                className="bg-indigo-600 hover:bg-indigo-700"
+                className="bg-indigo-600 hover:bg-indigo-700 font-semibold"
               >
                 {currentStep === wizardSteps.length - 1 
                   ? (isPending ? t('processing') : t('confirmBooking')) 

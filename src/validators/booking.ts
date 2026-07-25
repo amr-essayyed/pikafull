@@ -3,6 +3,8 @@ import { parsePhoneWithCountryCode, validatePhoneNumber } from "@/lib/phone-vali
 
 export const bookingSchema = z.object({
   customerId: z.string().optional(),
+  fullName: z.string().optional(),
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
   serviceId: z.string().min(1, "Please select a service"),
   propertyType: z.enum(["apartment", "house", "office", "studio", "villa", "other"]),
   bedrooms: z.number().min(0).max(10).default(1),

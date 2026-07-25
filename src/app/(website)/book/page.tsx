@@ -2,12 +2,20 @@ import { BookingWizard } from "@/components/booking/booking-wizard"
 import { getServices, getExtraServices, getCurrentCustomerProfile } from "@/actions/queries"
 import { getTranslations } from "next-intl/server"
 
+import { createClient } from "@/lib/supabase/server"
+
 export default async function BookPage() {
   const t = await getTranslations("BookingWizard")
   let services: any[] = []
   let extras: any[] = []
   let currentCustomer: any = null
+  let isAuthenticated = false
+
   try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    isAuthenticated = !!user
+
     ;[services, extras, currentCustomer] = await Promise.all([
       getServices(), 
       getExtraServices(),
@@ -30,6 +38,7 @@ export default async function BookPage() {
           services={services} 
           extras={extras} 
           initialCustomerData={currentCustomer}
+          isAuthenticated={isAuthenticated}
         />
       </div>
     </div>
