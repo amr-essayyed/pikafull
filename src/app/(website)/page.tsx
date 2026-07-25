@@ -251,7 +251,7 @@ export default async function HomePage() {
             <Button size="lg" className="bg-white text-indigo-700 hover:bg-indigo-50 h-12 px-8 text-base shadow-lg" asChild>
               <Link href="/book">{t("bookOnline")}</Link>
             </Button>
-            <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 h-12 px-8 text-base" asChild>
+            <Button size="lg" variant="ghost" className="border border-white/30 text-white hover:bg-white/10 hover:text-white h-12 px-8 text-base" asChild>
               <Link href="tel:+442012345678">
                 <Phone className="mr-2 h-4 w-4 rtl:ml-2 rtl:mr-0" />
                 {t("callUs")}
