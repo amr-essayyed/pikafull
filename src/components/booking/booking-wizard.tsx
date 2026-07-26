@@ -4,7 +4,7 @@ import * as React from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, User, UserPlus } from "lucide-react"
 import { useTranslations } from "next-intl"
 
 import { cn } from "@/lib/utils"
@@ -61,6 +61,7 @@ export function BookingWizard({
   const [datePopoverOpen, setDatePopoverOpen] = React.useState(false)
   const [unavailableTimeslots, setUnavailableTimeslots] = React.useState<string[]>([])
   const [isLoadingSlots, setIsLoadingSlots] = React.useState<boolean>(false)
+  const [customerMode, setCustomerMode] = React.useState<"existing" | "new">("existing")
 
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema) as any,
@@ -225,6 +226,16 @@ export function BookingWizard({
   }
 
   const next = async () => {
+    if (wizardSteps[currentStep].internalName === "Customer Selection") {
+      if (customerMode === "existing") {
+        const custId = form.getValues("customerId")
+        if (!custId) {
+          form.setError("customerId", { type: "custom", message: t("pleaseSelectCustomer") })
+          return
+        }
+      }
+    }
+
     const fields = getFieldsForStep(currentStep)
     const output = await form.trigger(fields as any, { shouldFocus: true })
 
@@ -247,7 +258,7 @@ export function BookingWizard({
     const stepName = wizardSteps[step].internalName;
     switch (stepName) {
       case "Customer Selection":
-        return ["customerId"]
+        return customerMode === "existing" ? ["customerId"] : ["fullName", "email"]
       case "Service Selection":
         return ["serviceId"]
       case "Property Details":
@@ -351,33 +362,137 @@ export function BookingWizard({
             {/* Step 0: Customer Selection (Admin Only) */}
             {wizardSteps[currentStep].internalName === "Customer Selection" && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <FormField
-                  control={form.control}
-                  name="customerId"
-                  render={({ field }) => (
-                     <FormItem className="space-y-3">
-                      <FormLabel>{t('selectCustomer')}</FormLabel>
-                      <FormControl>
-                        <select
-                          className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                          value={field.value || ""}
-                          onChange={(e) => {
-                            field.onChange(e)
-                            handleCustomerChange(e.target.value)
-                          }}
-                        >
-                          <option value="">{t('selectCustomerPlaceholder')}</option>
-                          {customers.map((c: any) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name} ({c.email})
-                            </option>
-                          ))}
-                        </select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {t('selectCustomerType')}
+                  </label>
+                  <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg max-w-md">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerMode("existing")
+                        form.clearErrors("customerId")
+                      }}
+                      className={cn(
+                        "flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium rounded-md transition-all cursor-pointer",
+                        customerMode === "existing"
+                          ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                      )}
+                    >
+                      <User className="w-4 h-4" />
+                      {t('existingCustomer')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerMode("new")
+                        form.setValue("customerId", "")
+                        form.clearErrors(["fullName", "email"])
+                      }}
+                      className={cn(
+                        "flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium rounded-md transition-all cursor-pointer",
+                        customerMode === "new"
+                          ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                      )}
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      {t('newCustomer')}
+                    </button>
+                  </div>
+                </div>
+
+                {customerMode === "existing" ? (
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="customerId"
+                      render={({ field }) => (
+                        <FormItem className="space-y-2">
+                          <FormLabel>{t('selectCustomer')}</FormLabel>
+                          <FormControl>
+                            <select
+                              className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                              value={field.value || ""}
+                              onChange={(e) => {
+                                field.onChange(e)
+                                handleCustomerChange(e.target.value)
+                              }}
+                            >
+                              <option value="">{t('selectCustomerPlaceholder')}</option>
+                              {customers.map((c: any) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name} ({c.email})
+                                </option>
+                              ))}
+                            </select>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {form.watch("customerId") && (
+                      <div className="p-4 rounded-lg bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-sm space-y-1">
+                        <p className="font-semibold text-indigo-900 dark:text-indigo-200">
+                          {customers.find((c: any) => c.id === form.watch("customerId"))?.name}
+                        </p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400">
+                          ✉️ {customers.find((c: any) => c.id === form.watch("customerId"))?.email}
+                        </p>
+                        {customers.find((c: any) => c.id === form.watch("customerId"))?.phone && (
+                          <p className="text-xs text-slate-600 dark:text-slate-400">
+                            📞 {customers.find((c: any) => c.id === form.watch("customerId"))?.phone}
+                          </p>
+                        )}
+                        {customers.find((c: any) => c.id === form.watch("customerId"))?.addressLine1 && (
+                          <p className="text-xs text-slate-600 dark:text-slate-400">
+                            📍 {customers.find((c: any) => c.id === form.watch("customerId"))?.addressLine1}, {customers.find((c: any) => c.id === form.watch("customerId"))?.city}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="fullName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('fullName')}</FormLabel>
+                            <FormControl>
+                              <Input placeholder="John Doe" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('email')}</FormLabel>
+                            <FormControl>
+                              <Input type="email" placeholder="john@example.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-lg p-3.5 flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+                      <span className="text-base leading-none">💡</span>
+                      <div>
+                        <strong>{t('newCustomerNotice')}</strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

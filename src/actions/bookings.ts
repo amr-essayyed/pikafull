@@ -16,83 +16,151 @@ export async function createBooking(data: BookingFormData) {
   const supabase = await createClient()
   const admin = createAdminClient()
 
-  // 1. Get current user or handle guest auto-registration
   const { data: { user } } = await supabase.auth.getUser()
-  let activeUserId: string | null = user?.id || null
 
-  if (!activeUserId) {
-    if (!data.fullName || !data.email) {
-      return { error: "Please enter your full name and email address to complete your booking." }
-    }
+  // 1. Resolve customer ID and target user profile
+  let targetUserId: string | null = null
+  let customerId: string | null = null
 
-    const generatedPassword = crypto.randomUUID().replace(/-/g, '') + '!A1'
-
-    // Create user via Admin API (bypasses RLS & confirms email immediately)
-    const { data: userData, error: userError } = await admin.auth.admin.createUser({
-      email: data.email,
-      password: generatedPassword,
-      email_confirm: true,
-      user_metadata: {
-        full_name: data.fullName,
-        role: "customer",
-      },
-    })
-
-    if (userError || !userData?.user) {
-      const msg = userError?.message || ""
-      if (msg.includes("already registered") || msg.includes("already exists")) {
-        return { error: "An account with this email already exists. Please sign in to complete your booking." }
-      }
-      return { error: userError?.message || "Failed to create customer account." }
-    }
-
-    activeUserId = userData.user.id
-
-    // Sign the new user in on the client cookies so their session is active
-    try {
-      await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: generatedPassword,
-      })
-    } catch (authErr) {
-      console.warn("Auto sign-in warning:", authErr)
-    }
-
-    // Send welcome email with generated password via Resend
-    try {
-      const apiKey = process.env.RESEND_API_KEY
-      if (apiKey) {
-        const resend = new Resend(apiKey)
-        await resend.emails.send({
-          from: 'Pikafull <noreply@4teq.store>',
-          to: data.email,
-          subject: 'Welcome to Pikafull! Your Account & Booking Details',
-          html: `<p>Hello ${data.fullName},</p><p>Thank you for booking with Pikafull!</p><p>An account has been automatically created for you to track your booking.</p><p>Your login email is: <strong>${data.email}</strong><br/>Your generated password is: <strong>${generatedPassword}</strong></p><p>Please log in and change your password as soon as possible.</p>`
-        })
-      }
-    } catch (emailErr) {
-      console.error("[Resend] Failed to send welcome email:", emailErr)
-    }
+  // Check if current user has admin/staff privileges
+  let isAdminOrStaff = false
+  if (user) {
+    const { data: curProfile } = await admin.from("profiles").select("role").eq("id", user.id).single()
+    const role = (curProfile as any)?.role
+    isAdminOrStaff = role === "owner" || role === "staff" || role === "admin"
   }
 
-  // 2. Get or create customer profile id using admin client (bypassing RLS)
-  let customerId: string
-  
+  // Case A: Admin/Staff selected an existing customer ID
   if (data.customerId) {
-    // Admin/Staff booking for a specific customer
-    const { data: profile } = await admin.from("profiles").select("role").eq("id", activeUserId).single()
-    // @ts-expect-error Typescript infers profile as never if DB types aren't fully generated
-    if (profile?.role === "owner" || profile?.role === "staff" || profile?.role === "admin") {
-      customerId = data.customerId
-    } else {
+    if (!isAdminOrStaff) {
       return { error: "You are not authorized to create bookings for other customers." }
     }
-  } else {
-    // Ensure profile row exists & update phone
+    customerId = data.customerId
+    const { data: custObj } = await admin.from("customers").select("profile_id").eq("id", customerId).single()
+    if (custObj) {
+      targetUserId = (custObj as any).profile_id
+    }
+  } 
+  // Case B: Admin/Staff creating a booking for a new customer OR Guest booking on public site
+  else if (isAdminOrStaff || !user) {
+    if (!data.fullName || !data.email) {
+      return { error: "Please enter customer full name and email address to complete booking." }
+    }
+
+    const cleanedEmail = data.email.toLowerCase().trim()
+
+    // Check if user profile already exists with this email
+    const { data: existingProfile } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("email", cleanedEmail)
+      .maybeSingle()
+
+    if (existingProfile) {
+      targetUserId = (existingProfile as any).id
+
+      if (data.phone && targetUserId) {
+        await (admin.from("profiles") as any).update({ phone: data.phone }).eq("id", targetUserId)
+      }
+
+      const { data: existingCust } = await (admin.from("customers") as any)
+        .select("id")
+        .eq("profile_id", targetUserId)
+        .maybeSingle()
+
+      if (existingCust) {
+        customerId = (existingCust as any).id
+      } else {
+        const { data: newCust, error: custErr } = await admin
+          .from("customers")
+          .insert({ profile_id: targetUserId } as any)
+          .select("id")
+          .single()
+
+        if (custErr || !newCust) {
+          return { error: "Failed to create customer profile: " + (custErr?.message || "") }
+        }
+        customerId = (newCust as any).id
+      }
+    } else {
+      // Create new auth user via Admin API
+      const generatedPassword = crypto.randomUUID().replace(/-/g, '') + '!A1'
+
+      const { data: userData, error: userError } = await admin.auth.admin.createUser({
+        email: cleanedEmail,
+        password: generatedPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: data.fullName,
+          role: "customer",
+        },
+      })
+
+      if (userError || !userData?.user) {
+        const msg = userError?.message || ""
+        if (msg.includes("already registered") || msg.includes("already exists")) {
+          return { error: "An account with this email already exists. Please select them from existing accounts." }
+        }
+        return { error: userError?.message || "Failed to create customer account." }
+      }
+
+      targetUserId = userData.user.id
+
+      await admin.from("profiles").upsert({
+        id: targetUserId,
+        email: cleanedEmail,
+        full_name: data.fullName,
+        phone: data.phone || null,
+        role: "customer",
+      } as any)
+
+      const { data: newCustomer, error: insertError } = await admin
+        .from("customers")
+        .insert({ profile_id: targetUserId } as any)
+        .select("id")
+        .single()
+
+      if (insertError || !newCustomer) {
+        return { error: "Failed to create customer profile: " + (insertError?.message || "") }
+      }
+      customerId = (newCustomer as any).id
+
+      // Only auto sign-in if guest booking on website (not when admin creates in dashboard)
+      if (!user) {
+        try {
+          await supabase.auth.signInWithPassword({
+            email: cleanedEmail,
+            password: generatedPassword,
+          })
+        } catch (authErr) {
+          console.warn("Auto sign-in warning:", authErr)
+        }
+      }
+
+      try {
+        const apiKey = process.env.RESEND_API_KEY
+        if (apiKey) {
+          const resend = new Resend(apiKey)
+          await resend.emails.send({
+            from: 'Pikafull <noreply@4teq.store>',
+            to: cleanedEmail,
+            subject: 'Welcome to Pikafull! Your Account & Booking Details',
+            html: `<p>Hello ${data.fullName},</p><p>Thank you for booking with Pikafull!</p><p>An account has been automatically created for you to track your booking.</p><p>Your login email is: <strong>${cleanedEmail}</strong><br/>Your generated password is: <strong>${generatedPassword}</strong></p><p>Please log in and change your password as soon as possible.</p>`
+          })
+        }
+      } catch (emailErr) {
+        console.error("[Resend] Failed to send welcome email:", emailErr)
+      }
+    }
+  } 
+  // Case C: Authenticated Customer booking for themselves
+  else {
+    targetUserId = user.id
+
     await admin.from("profiles").upsert({
-      id: activeUserId,
-      email: data.email || user?.email,
-      full_name: data.fullName || user?.user_metadata?.full_name || "",
+      id: targetUserId,
+      email: data.email || user.email,
+      full_name: data.fullName || user.user_metadata?.full_name || "",
       phone: data.phone || null,
       role: "customer",
     } as any)
@@ -100,7 +168,7 @@ export async function createBooking(data: BookingFormData) {
     const { data: existingCust } = await admin
       .from("customers")
       .select("id")
-      .eq("profile_id", activeUserId)
+      .eq("profile_id", targetUserId)
       .maybeSingle()
 
     if (existingCust) {
@@ -108,35 +176,37 @@ export async function createBooking(data: BookingFormData) {
     } else {
       const { data: newCustomer, error: insertError } = await admin
         .from("customers")
-        .insert({ profile_id: activeUserId } as any)
+        .insert({ profile_id: targetUserId } as any)
         .select("id")
         .single()
 
       if (insertError || !newCustomer) {
-        console.error("Failed to create customer profile:", insertError);
-        return { error: "Failed to create customer profile: " + (insertError?.message || "Unknown error") }
+        return { error: "Failed to create customer profile: " + (insertError?.message || "") }
       }
       customerId = (newCustomer as any).id
     }
   }
 
+  if (!customerId) {
+    return { error: "Could not resolve customer account for booking." }
+  }
+
   try {
     if (data.saveToProfile !== false) {
-      if (data.phone) {
-        await admin.from("profiles").update({ phone: data.phone } as any).eq("id", activeUserId)
+      if (data.phone && targetUserId) {
+        await (admin.from("profiles") as any).update({ phone: data.phone }).eq("id", targetUserId)
       }
 
-      const { data: existingAddr } = await admin
-        .from("addresses")
+      const { data: existingAddr } = await (admin.from("addresses") as any)
         .select("id")
         .eq("customer_id", customerId)
         .maybeSingle()
 
       if (existingAddr) {
-        await admin.from("addresses").update({
+        await (admin.from("addresses") as any).update({
           address_line_1: data.addressLine1,
           city: data.city,
-        } as any).eq("id", (existingAddr as any).id)
+        }).eq("id", (existingAddr as any).id)
       }
     }
 
