@@ -198,3 +198,73 @@ export async function sendWhatsAppNotification(payload: WhatsAppNotificationPayl
 
   return { success: true, messageId: "logged-only" }
 }
+
+/**
+ * Server-side function to send a WhatsApp OTP via Green API for authentication.
+ */
+export async function sendWhatsAppOTP(phone: string, otp: string): Promise<{ success: boolean; error?: string }> {
+  const sanitizedPhone = sanitizePhoneNumber(phone)
+  if (!sanitizedPhone) {
+    return { success: false, error: "Invalid phone number" }
+  }
+
+  const messageText = `أهلاً بك في بيكافول! 👋\n\nرمز التحقق الخاص بك هو: *${otp}*\n\nيرجى عدم مشاركة هذا الرمز مع أي شخص.`
+
+  console.log(`\n========================================`)
+  console.log(`📲 [WhatsApp OTP Triggered]`)
+  console.log(`TO: ${sanitizedPhone}`)
+  console.log(`OTP: ${otp}`)
+  console.log(`========================================\n`)
+
+  const apiUrl = process.env.WHATSAPP_API_URL
+  const apiToken = process.env.WHATSAPP_API_TOKEN
+
+  if (!apiUrl || apiUrl.includes("YOUR_INSTANCE_ID")) {
+    console.warn("[WhatsApp OTP] Missing or invalid WHATSAPP_API_URL.")
+    return { success: true } // Pretend success in local if not configured
+  }
+
+  try {
+    let headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+    let requestBody: any = {}
+
+    if (apiUrl.includes("green-api.com")) {
+      requestBody = {
+        chatId: `${sanitizedPhone}@c.us`,
+        message: messageText,
+      }
+    } else if (apiUrl.includes("ultramsg.com")) {
+      requestBody = {
+        token: apiToken,
+        to: sanitizedPhone,
+        body: messageText,
+      }
+    } else {
+      if (apiToken) headers["Authorization"] = `Bearer ${apiToken}`
+      requestBody = {
+        to: sanitizedPhone,
+        chatId: `${sanitizedPhone}@c.us`,
+        body: messageText,
+      }
+    }
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      console.error("[WhatsApp OTP Error]:", response.status, errText)
+      return { success: false, error: errText }
+    }
+    
+    return { success: true }
+  } catch (err: any) {
+    console.error("[WhatsApp OTP Fetch Exception]:", err)
+    return { success: false, error: err.message }
+  }
+}

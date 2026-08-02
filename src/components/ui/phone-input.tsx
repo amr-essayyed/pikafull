@@ -15,6 +15,7 @@ interface PhoneInputProps {
   id?: string
   name?: string
   label?: string
+  autoComplete?: string
 }
 
 export function PhoneInput({
@@ -27,6 +28,7 @@ export function PhoneInput({
   id = "phone",
   name = "phone",
   label = "Phone Number",
+  autoComplete,
 }: PhoneInputProps) {
   const parsed = React.useMemo(() => parsePhoneWithCountryCode(value), [value])
   const [countryCode, setCountryCode] = React.useState<string>(parsed.countryCode)
@@ -94,6 +96,7 @@ export function PhoneInput({
             onChange={handleNumberChange}
             onBlur={() => setTouched(true)}
             placeholder={currentCountryObj.placeholder}
+            autoComplete={autoComplete}
             className={cn(activeError && "border-destructive focus-visible:ring-destructive/20")}
           />
         </div>

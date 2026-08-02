@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form"
 import { useTranslations } from "next-intl"
 import { ArrowLeft } from "lucide-react"
 
-import { login } from "@/actions/auth"
+import { redirectAfterLogin } from "@/actions/auth"
 import { loginSchema, type LoginFormData } from "@/validators/auth"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,7 +19,9 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { PhoneInput } from "@/components/ui/phone-input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { createClient } from "@/lib/supabase/client"
 
 import { useSearchParams } from "next/navigation"
 
@@ -31,30 +33,52 @@ function LoginForm() {
 
   const [error, setError] = React.useState<string | null>(null)
   const [isPending, startTransition] = React.useTransition()
+  const [step, setStep] = React.useState<"phone" | "otp">("phone")
+  const supabase = createClient()
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
-      password: "",
+      phone: "",
+      otp: "",
     },
   })
 
-  function onSubmit(values: LoginFormData) {
+  async function onRequestOTP(phone: string) {
     setError(null)
     startTransition(async () => {
-      const formData = new FormData()
-      formData.append("email", values.email)
-      formData.append("password", values.password)
-      if (redirectTo) {
-        formData.append("redirectTo", redirectTo)
-      }
-      
-      const result = await login(formData)
-      if (result?.error) {
-        setError(typeof result.error === 'string' ? result.error : JSON.stringify(result.error))
+      const { error } = await supabase.auth.signInWithOtp({ phone })
+      if (error) {
+        setError(error.message)
+      } else {
+        setStep("otp")
       }
     })
+  }
+
+  async function onVerifyOTP(phone: string, token: string) {
+    setError(null)
+    startTransition(async () => {
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone,
+        token,
+        type: "sms",
+      })
+      if (error) {
+        setError(error.message)
+      } else if (data.user) {
+        // Successful login, call server action to handle redirect
+        await redirectAfterLogin(redirectTo || undefined)
+      }
+    })
+  }
+
+  function onSubmit(values: LoginFormData) {
+    if (step === "phone") {
+      onRequestOTP(values.phone)
+    } else if (step === "otp" && values.otp) {
+      onVerifyOTP(values.phone, values.otp)
+    }
   }
 
   return (
@@ -74,7 +98,7 @@ function LoginForm() {
           {tAuth('loginTitle')}
         </h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          {tAuth('loginSubtitle')}
+          {step === "phone" ? tAuth('loginSubtitle') : tAuth('enterOtpSubtitle')}
         </p>
       </div>
 
@@ -87,43 +111,59 @@ function LoginForm() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{tCommon('emailLabel')}</FormLabel>
-                  <FormControl>
-                    <Input placeholder={tCommon('emailPlaceholder')} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center justify-between">
-                    <FormLabel>{tCommon('passwordLabel')}</FormLabel>
-                    <Link
-                      href="/forgot-password"
-                      className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
-                    >
-                      {tAuth('forgotPasswordLink')}
-                    </Link>
-                  </div>
-                  <FormControl>
-                    <Input type="password" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={isPending}>
-              {isPending ? tAuth('signingInButton') : tAuth('signInButton')}
-            </Button>
+            {step === "phone" ? (
+              <>
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{tCommon('phoneLabel')}</FormLabel>
+                      <FormControl>
+                        <PhoneInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          autoComplete="tel"
+                          required
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={isPending}>
+                  {isPending ? tAuth('sendingCode') : tAuth('sendCode')}
+                </Button>
+              </>
+            ) : (
+              <>
+                <FormField
+                  control={form.control}
+                  name="otp"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{tCommon('otpLabel')}</FormLabel>
+                      <FormControl>
+                        <Input placeholder="123456" {...field} autoComplete="one-time-code" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={isPending}>
+                  {isPending ? tAuth('verifying') : tAuth('verifyButton')}
+                </Button>
+                <div className="text-center mt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setStep("phone")}
+                    className="text-sm text-indigo-600 hover:underline"
+                  >
+                    {tAuth('changePhoneNumber')}
+                  </button>
+                </div>
+              </>
+            )}
           </form>
         </Form>
       </div>

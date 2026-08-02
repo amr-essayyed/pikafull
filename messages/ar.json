@@ -23,7 +23,9 @@
     "cancel": "إلغاء",
     "emailLabel": "البريد الإلكتروني",
     "emailPlaceholder": "name@example.com",
-    "passwordLabel": "كلمة المرور"
+    "passwordLabel": "كلمة المرور",
+    "phoneLabel": "رقم الهاتف",
+    "otpLabel": "رمز التحقق"
   },
   "Auth": {
     "loginTitle": "مرحباً بعودتك",
@@ -61,6 +63,12 @@
     "staffEmailPlaceholder": "admin@sparkleclean.com",
     "accessDashboardButton": "الدخول للوحة التحكم",
     "authenticatingButton": "جاري المصادقة...",
+    "enterOtpSubtitle": "أدخل الكود المكون من 6 أرقام المرسل إلى واتساب الخاص بك",
+    "sendingCode": "جاري إرسال الكود...",
+    "sendCode": "إرسال كود الواتساب",
+    "verifying": "جاري التحقق...",
+    "verifyButton": "تحقق وتسجيل الدخول",
+    "changePhoneNumber": "تغيير رقم الهاتف",
     "notStaff": "لست من فريق العمل؟",
     "customerLoginLink": "دخول العملاء"
   },
@@ -167,6 +175,7 @@
     "blogPostPlaceholder": "هذا عنصر نائب لصفحة تفاصيل مقال المدونة. سيتم تحميل المحتوى من نظام إدارة المحتوى بناءً على الرابط."
   },
   "BookingWizard": {
+    "optional": "(اختياري)",
     "bookCleaning": "احجز خدمة تنظيف",
     "getInstantQuote": "احصل على تسعير فوري",
     "bookDesc": "حدد خدمتك، اختر التاريخ، واحجز خدمة التنظيف في أقل من 60 ثانية.",

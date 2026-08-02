@@ -23,7 +23,9 @@
     "cancel": "Cancel",
     "emailLabel": "Email address",
     "emailPlaceholder": "name@example.com",
-    "passwordLabel": "Password"
+    "passwordLabel": "Password",
+    "phoneLabel": "Phone Number",
+    "otpLabel": "Verification Code"
   },
   "Auth": {
     "loginTitle": "Welcome back",
@@ -61,6 +63,12 @@
     "staffEmailPlaceholder": "admin@sparkleclean.com",
     "accessDashboardButton": "Access Dashboard",
     "authenticatingButton": "Authenticating...",
+    "enterOtpSubtitle": "Enter the 6-digit code sent to your WhatsApp",
+    "sendingCode": "Sending code...",
+    "sendCode": "Send WhatsApp Code",
+    "verifying": "Verifying...",
+    "verifyButton": "Verify & Login",
+    "changePhoneNumber": "Change phone number",
     "notStaff": "Not a staff member?",
     "customerLoginLink": "Customer Login"
   },
@@ -167,6 +175,7 @@
     "blogPostPlaceholder": "This is a placeholder for a blog post detail page. Content will be loaded from the CMS based on the slug."
   },
   "BookingWizard": {
+    "optional": "(Optional)",
     "bookCleaning": "Book a Cleaning",
     "getInstantQuote": "Get an Instant Quote",
     "bookDesc": "Select your service, choose your date, and book your cleaning in under 60 seconds.",

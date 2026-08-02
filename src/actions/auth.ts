@@ -156,3 +156,30 @@ export async function updatePassword(formData: FormData) {
 
   redirect("/dashboard")
 }
+
+export async function redirectAfterLogin(redirectTo?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect("/login")
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  revalidatePath("/", "layout")
+
+  // @ts-expect-error Typescript infers profile as never if DB types aren't fully generated
+  const role = profile?.role
+  if (role === "owner" || role === "staff") {
+    redirect("/dashboard")
+  } else if (role === "employee") {
+    redirect("/employee/my-schedule")
+  } else {
+    redirect(redirectTo && redirectTo.startsWith("/") ? redirectTo : "/")
+  }
+}

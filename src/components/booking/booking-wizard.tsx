@@ -280,7 +280,7 @@ export function BookingWizard({
     const stepName = wizardSteps[step].internalName;
     switch (stepName) {
       case "Customer Selection":
-        return customerMode === "existing" ? ["customerId"] : ["fullName", "email"]
+        return customerMode === "existing" ? ["customerId"] : ["fullName", "phone"]
       case "Service Selection":
         return ["serviceId"]
       case "Property Details":
@@ -516,18 +516,42 @@ export function BookingWizard({
                       />
                       <FormField
                         control={form.control}
-                        name="email"
+                        name="phone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t('email')}</FormLabel>
+                            <FormLabel>{t('phone')} (WhatsApp)</FormLabel>
                             <FormControl>
-                              <Input type="email" placeholder={t('placeholderEmail')} {...field} />
+                              <PhoneInput
+                                id="admin-new-customer-phone"
+                                name="phone"
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                required={true}
+                                autoComplete="tel"
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
+
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {t('email')}
+                            <span className="text-muted-foreground ml-1 font-normal text-xs">{t('optional')}</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder={t('placeholderEmail')} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     <div className="bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-lg p-3.5 flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
                       <span className="text-base leading-none">💡</span>
@@ -799,18 +823,42 @@ export function BookingWizard({
                       />
                       <FormField
                         control={form.control}
-                        name="email"
+                        name="phone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t('email')}</FormLabel>
+                            <FormLabel>{t('phone')} (WhatsApp)</FormLabel>
                             <FormControl>
-                              <Input type="email" placeholder={t('placeholderEmail')} {...field} />
+                              <PhoneInput
+                                id="booking-phone-guest"
+                                name="phone"
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                required={true}
+                                autoComplete="tel"
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
+
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {t('email')}
+                            <span className="text-muted-foreground ml-1 font-normal text-xs">{t('optional')}</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder={t('placeholderEmail')} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     <div className="bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 rounded-lg p-3.5 flex items-start gap-2.5 text-xs text-indigo-900 dark:text-indigo-200">
                       <span className="text-base leading-none">💡</span>
@@ -853,25 +901,28 @@ export function BookingWizard({
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('phone')}</FormLabel>
-                          <FormControl>
-                            <PhoneInput
-                              id="booking-phone"
-                              name="phone"
-                              value={field.value || ""}
-                              onChange={field.onChange}
-                              required={true}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {isAuthenticated && (
+                      <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('phone')}</FormLabel>
+                            <FormControl>
+                              <PhoneInput
+                                id="booking-phone"
+                                name="phone"
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                required={true}
+                                autoComplete="tel"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
 
                   {/* Option to save address & phone as default in customer profile */}
