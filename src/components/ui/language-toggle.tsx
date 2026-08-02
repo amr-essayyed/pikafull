@@ -2,7 +2,6 @@
 
 import { useTransition } from "react"
 import { setLocale } from "@/actions/locale"
-import { Languages } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function LanguageToggle({ currentLocale }: { currentLocale: string }) {
@@ -26,10 +25,6 @@ export function LanguageToggle({ currentLocale }: { currentLocale: string }) {
         isPending && "opacity-60 pointer-events-none"
       )}
     >
-      <div className="flex items-center px-1.5 text-slate-500 dark:text-slate-400" aria-hidden="true">
-        <Languages className="h-3.5 w-3.5" />
-      </div>
-
       <div className="flex items-center gap-0.5">
         <button
           type="button"
