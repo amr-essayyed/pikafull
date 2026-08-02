@@ -283,7 +283,7 @@ export async function createBooking(data: BookingFormData) {
 
     // Trigger WhatsApp & In-App pending notifications
     try {
-      await triggerBookingWhatsAppNotification((booking as any).id, "pending")
+      await triggerBookingWhatsAppNotification((booking as any).id, "pending", data.phone, data.fullName)
     } catch (notifErr) {
       console.error("Failed to send booking pending notifications:", notifErr)
     }
@@ -555,7 +555,12 @@ export async function updateBookingStatus(bookingId: string, newStatus: string) 
   return { success: true, status: newStatus }
 }
 
-async function triggerBookingWhatsAppNotification(bookingId: string, status: string) {
+async function triggerBookingWhatsAppNotification(
+  bookingId: string,
+  status: string,
+  fallbackPhone?: string,
+  fallbackName?: string
+) {
   const admin = createAdminClient()
 
   const { data: booking, error } = await admin
@@ -596,8 +601,8 @@ async function triggerBookingWhatsAppNotification(bookingId: string, status: str
 
   const custProfile = (booking as any)?.customers?.profiles
   const custUserId = (booking as any)?.customers?.profile_id
-  const customerPhone = custProfile?.phone
-  const customerName = custProfile?.full_name
+  const customerPhone = custProfile?.phone || fallbackPhone
+  const customerName = custProfile?.full_name || fallbackName
 
   const empProfile = (booking as any)?.employees?.profiles
   const employeeName = empProfile?.full_name

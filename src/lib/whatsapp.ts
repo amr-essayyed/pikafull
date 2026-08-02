@@ -22,10 +22,35 @@ export function sanitizePhoneNumber(phone: string): string {
   if (cleaned.startsWith("+")) {
     cleaned = cleaned.substring(1)
   }
-  // Strip leading zero if present without country code
-  if (cleaned.startsWith("0")) {
-    cleaned = cleaned.replace(/^0+/, "")
+
+  // Handle leading 00 (e.g. 00966...)
+  if (cleaned.startsWith("00")) {
+    cleaned = cleaned.substring(2)
   }
+
+  // If phone starts with local single 0 (e.g. 010..., 05...)
+  if (cleaned.startsWith("0")) {
+    cleaned = cleaned.substring(1)
+  }
+
+  // Auto-detect missing country codes for common regions:
+  // Egyptian mobile: 10 digits starting with 10, 11, 12, 15
+  if (cleaned.length === 10 && /^(10|11|12|15)/.test(cleaned)) {
+    cleaned = "20" + cleaned
+  }
+  // Saudi mobile: 9 digits starting with 5
+  else if (cleaned.length === 9 && /^5/.test(cleaned)) {
+    cleaned = "966" + cleaned
+  }
+  // UAE mobile: 9 digits starting with 50, 52, 54, 55, 56, 58
+  else if (cleaned.length === 9 && /^5[024568]/.test(cleaned)) {
+    cleaned = "971" + cleaned
+  }
+  // UK mobile: 10 digits starting with 7
+  else if (cleaned.length === 10 && /^7/.test(cleaned)) {
+    cleaned = "44" + cleaned
+  }
+
   return cleaned
 }
 
