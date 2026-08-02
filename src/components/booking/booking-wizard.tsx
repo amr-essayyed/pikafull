@@ -402,7 +402,7 @@ export function BookingWizard({
         )}
 
         <Form {...form}>
-          <form className="space-y-8">
+          <form className="space-y-8 pb-24 md:pb-0">
             {/* Step 0: Customer Selection (Admin Only) */}
             {wizardSteps[currentStep].internalName === "Customer Selection" && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -508,7 +508,7 @@ export function BookingWizard({
                           <FormItem>
                             <FormLabel>{t('fullName')}</FormLabel>
                             <FormControl>
-                              <Input placeholder="John Doe" {...field} />
+                              <Input placeholder={t('placeholderName')} {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -521,7 +521,7 @@ export function BookingWizard({
                           <FormItem>
                             <FormLabel>{t('email')}</FormLabel>
                             <FormControl>
-                              <Input type="email" placeholder="john@example.com" {...field} />
+                              <Input type="email" placeholder={t('placeholderEmail')} {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -791,7 +791,7 @@ export function BookingWizard({
                           <FormItem>
                             <FormLabel>{t('fullName')}</FormLabel>
                             <FormControl>
-                              <Input placeholder="John Doe" {...field} />
+                              <Input placeholder={t('placeholderName')} {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -804,7 +804,7 @@ export function BookingWizard({
                           <FormItem>
                             <FormLabel>{t('email')}</FormLabel>
                             <FormControl>
-                              <Input type="email" placeholder="john@example.com" {...field} />
+                              <Input type="email" placeholder={t('placeholderEmail')} {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -830,7 +830,7 @@ export function BookingWizard({
                       <FormItem>
                         <FormLabel>{t('addressLine1')}</FormLabel>
                         <FormControl>
-                          <Input placeholder="123 Main St" {...field} />
+                          <Input placeholder={t('placeholderAddress')} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -927,8 +927,7 @@ export function BookingWizard({
                   : t('continue')}
               </Button>
             </div>
-            {/* Spacer to prevent sticky bar from overlapping form content on mobile */}
-            <div className="h-20 md:h-0" />
+            {/* Form actions padding is handled by the form's pb-24 class on mobile */}
           </form>
         </Form>
       </div>

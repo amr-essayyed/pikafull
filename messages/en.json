@@ -219,7 +219,10 @@
     "contactAccountDetails": "Contact & Account Details",
     "autoAccountCreation": "Auto account creation",
     "autoAccountCreationNotice": "Automatic Account Creation:",
-    "autoAccountCreationDesc": "A customer account will be created automatically for this email. We will email your login password to you upon confirmation."
+    "autoAccountCreationDesc": "A customer account will be created automatically for this email. We will email your login password to you upon confirmation.",
+    "placeholderName": "John Doe",
+    "placeholderEmail": "john@example.com",
+    "placeholderAddress": "123 Main St"
   },
   "CustomerDashboard": {
     "myDashboard": "My Dashboard",
