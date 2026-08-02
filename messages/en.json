@@ -210,7 +210,8 @@
     "back": "Back",
     "processing": "Processing...",
     "confirmBooking": "Confirm Booking",
-    "continue": "Continue"
+    "continue": "Continue",
+    "of": "of"
   },
   "CustomerDashboard": {
     "myDashboard": "My Dashboard",

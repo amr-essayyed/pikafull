@@ -74,7 +74,7 @@ export function PhoneInput({
           <select
             value={countryCode}
             onChange={handleCountryCodeChange}
-            className="flex h-10 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+            className="flex h-10 items-center justify-between rounded-md border border-input bg-background pl-2.5 pr-7 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30 max-w-[7rem] sm:max-w-none"
           >
             {COUNTRY_CODES.map((c) => (
               <option key={c.code} value={c.code}>

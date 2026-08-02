@@ -4,8 +4,9 @@ import * as React from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { format } from "date-fns"
-import { CalendarIcon, User, UserPlus } from "lucide-react"
-import { useTranslations } from "next-intl"
+import { ar as arLocale } from "date-fns/locale"
+import { CalendarIcon, User, UserPlus, Check, Minus, Plus } from "lucide-react"
+import { useLocale, useTranslations } from "next-intl"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -57,6 +58,9 @@ export function BookingWizard({
   initialCustomerData,
 }: BookingWizardProps) {
   const t = useTranslations("BookingWizard")
+  const currentLocale = useLocale()
+  const isArabic = currentLocale === "ar"
+  const dateFnsLocale = isArabic ? arLocale : undefined
   const [currentStep, setCurrentStep] = React.useState(0)
   const [error, setError] = React.useState<string | null>(null)
   const [isPending, startTransition] = React.useTransition()
@@ -332,14 +336,36 @@ export function BookingWizard({
         </div>
       )}
 
-      {/* Progress Bar */}
-      <nav aria-label="Progress">
-        <ol role="list" className="space-y-4 md:flex md:space-y-0 md:space-x-8 p-6 bg-slate-50 dark:bg-slate-950 border-b">
+      {/* Progress Bar — Compact on mobile, full on desktop */}
+      {/* Mobile compact stepper */}
+      <div className="block md:hidden p-4 bg-slate-50 dark:bg-slate-950 border-b">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400">
+            {wizardSteps[currentStep].id} {t('of')} {wizardSteps.length}
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {Math.round(((currentStep + 1) / wizardSteps.length) * 100)}%
+          </p>
+        </div>
+        <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
+          <div
+            className="h-full bg-indigo-600 rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${((currentStep + 1) / wizardSteps.length) * 100}%` }}
+          />
+        </div>
+        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+          {wizardSteps[currentStep].name}
+        </p>
+      </div>
+
+      {/* Desktop full stepper */}
+      <nav aria-label="Progress" className="hidden md:block">
+        <ol role="list" className="flex space-x-8 p-6 bg-slate-50 dark:bg-slate-950 border-b">
           {wizardSteps.map((step, index) => (
-            <li key={step.internalName} className="md:flex-1">
+            <li key={step.internalName} className="flex-1">
               <div
                 className={cn(
-                  "group pl-4 py-2 flex flex-col border-l-4 md:pl-0 md:pt-4 md:pb-0 md:border-l-0 md:border-t-4",
+                  "group pt-4 pb-0 border-t-4 flex flex-col",
                   currentStep > index
                     ? "border-indigo-600 hover:border-indigo-800"
                     : currentStep === index
@@ -528,11 +554,19 @@ export function BookingWizard({
                             <div
                               key={service.id}
                               className={cn(
-                                "border rounded-xl p-4 cursor-pointer transition-all hover:border-indigo-600",
-                                field.value === service.id ? "border-indigo-600 ring-1 ring-indigo-600 bg-indigo-50 dark:bg-indigo-950" : ""
+                                "relative border rounded-xl p-4 cursor-pointer transition-all duration-200 hover:border-indigo-600 active:scale-[0.98]",
+                                field.value === service.id
+                                  ? "border-indigo-600 ring-1 ring-indigo-600 bg-indigo-50 dark:bg-indigo-950"
+                                  : "hover:shadow-sm"
                               )}
                               onClick={() => field.onChange(service.id)}
                             >
+                              {/* Selection checkmark badge */}
+                              {field.value === service.id && (
+                                <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                                  <Check className="w-3.5 h-3.5" />
+                                </div>
+                              )}
                               <h3 className="font-bold">{service.name}</h3>
                               <p className="text-indigo-600 font-semibold mt-2">{t('fromPrice')}{service.base_price}</p>
                             </div>
@@ -557,13 +591,27 @@ export function BookingWizard({
                       <FormItem>
                         <FormLabel>{t('bedrooms')}</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            min={0} 
-                            max={10} 
-                            {...field} 
-                            onChange={e => field.onChange(parseInt(e.target.value))} 
-                          />
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => field.onChange(Math.max(0, (field.value || 0) - 1))}
+                              className="shrink-0 w-11 h-11 rounded-lg border border-input bg-background flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
+                              disabled={field.value <= 0}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                            <span className="w-12 text-center text-lg font-semibold tabular-nums">
+                              {field.value || 0}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => field.onChange(Math.min(10, (field.value || 0) + 1))}
+                              className="shrink-0 w-11 h-11 rounded-lg border border-input bg-background flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
+                              disabled={field.value >= 10}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -576,13 +624,27 @@ export function BookingWizard({
                       <FormItem>
                         <FormLabel>{t('bathrooms')}</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            min={0} 
-                            max={10} 
-                            {...field} 
-                            onChange={e => field.onChange(parseInt(e.target.value))} 
-                          />
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => field.onChange(Math.max(0, (field.value || 0) - 1))}
+                              className="shrink-0 w-11 h-11 rounded-lg border border-input bg-background flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
+                              disabled={field.value <= 0}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                            <span className="w-12 text-center text-lg font-semibold tabular-nums">
+                              {field.value || 0}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => field.onChange(Math.min(10, (field.value || 0) + 1))}
+                              className="shrink-0 w-11 h-11 rounded-lg border border-input bg-background flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
+                              disabled={field.value >= 10}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -615,11 +677,11 @@ export function BookingWizard({
                               )}
                             >
                               <span>
-                                {isDateValid ? format(selectedDate, "PPP") : t('pickDate')}
+                                {isDateValid ? format(selectedDate, "PPP", { locale: dateFnsLocale }) : t('pickDate')}
                               </span>
                               <CalendarIcon className="h-4 w-4 opacity-50 ml-2" />
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
+                            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-auto p-0" align="start">
                               <Calendar
                                 mode="single"
                                 selected={isDateValid ? selectedDate : undefined}
@@ -632,6 +694,8 @@ export function BookingWizard({
                                 disabled={(date) =>
                                   date < new Date(new Date().setHours(0, 0, 0, 0))
                                 }
+                                locale={dateFnsLocale}
+                                dir={isArabic ? "rtl" : "ltr"}
                               />
                             </PopoverContent>
                           </Popover>
@@ -644,42 +708,65 @@ export function BookingWizard({
                   <FormField
                     control={form.control}
                     name="scheduledTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('time')}</FormLabel>
-                        <FormControl>
-                          <select
-                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            {...field}
-                            disabled={!watchedDate || isLoadingSlots}
-                          >
-                            <option value="">
-                              {!watchedDate
-                                ? t('selectDateFirst')
-                                : isLoadingSlots
-                                ? t('checkingAvailability')
-                                : unavailableTimeslots.length >= 5
-                                ? t('noTimeslotsAvailable')
-                                : t('selectTime')}
-                            </option>
-                            {[
-                              { value: "08:00", label: "08:00 AM" },
-                              { value: "10:00", label: "10:00 AM" },
-                              { value: "12:00", label: "12:00 PM" },
-                              { value: "14:00", label: "02:00 PM" },
-                              { value: "16:00", label: "04:00 PM" },
-                            ]
-                              .filter((slot) => !unavailableTimeslots.includes(slot.value))
-                              .map((slot) => (
-                                <option key={slot.value} value={slot.value}>
-                                  {slot.label}
-                                </option>
-                              ))}
-                          </select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const allSlots = isArabic ? [
+                        { value: "08:00", label: "08:00 ص" },
+                        { value: "10:00", label: "10:00 ص" },
+                        { value: "12:00", label: "12:00 م" },
+                        { value: "14:00", label: "02:00 م" },
+                        { value: "16:00", label: "04:00 م" },
+                      ] : [
+                        { value: "08:00", label: "08:00 AM" },
+                        { value: "10:00", label: "10:00 AM" },
+                        { value: "12:00", label: "12:00 PM" },
+                        { value: "14:00", label: "02:00 PM" },
+                        { value: "16:00", label: "04:00 PM" },
+                      ]
+                      const availableSlots = allSlots.filter(
+                        (slot) => !unavailableTimeslots.includes(slot.value)
+                      )
+
+                      return (
+                        <FormItem>
+                          <FormLabel>{t('time')}</FormLabel>
+                          <FormControl>
+                            <div>
+                              {!watchedDate ? (
+                                <p className="text-sm text-muted-foreground py-2">{t('selectDateFirst')}</p>
+                              ) : isLoadingSlots ? (
+                                <p className="text-sm text-muted-foreground py-2">{t('checkingAvailability')}</p>
+                              ) : availableSlots.length === 0 ? (
+                                <p className="text-sm text-destructive py-2">{t('noTimeslotsAvailable')}</p>
+                              ) : (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                  {availableSlots.map((slot) => (
+                                    <button
+                                      key={slot.value}
+                                      type="button"
+                                      onClick={() => field.onChange(slot.value)}
+                                      className={cn(
+                                        "relative h-11 rounded-lg border text-sm font-medium transition-all duration-200 active:scale-[0.97] cursor-pointer",
+                                        field.value === slot.value
+                                          ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-600"
+                                          : "border-input bg-background text-slate-700 dark:text-slate-300 hover:border-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                      )}
+                                    >
+                                      {slot.label}
+                                      {field.value === slot.value && (
+                                        <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                                          <Check className="w-2.5 h-2.5" />
+                                        </div>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )
+                    }}
                   />
                 </div>
               </div>
@@ -814,13 +901,14 @@ export function BookingWizard({
               </div>
             )}
 
-            {/* Form Actions */}
-            <div className="pt-8 flex justify-between items-center border-t mt-8">
+            {/* Form Actions — sticky on mobile, static on desktop */}
+            <div className="fixed bottom-0 inset-x-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t p-4 flex justify-between items-center gap-3 md:static md:bg-transparent md:dark:bg-transparent md:backdrop-blur-none md:border-t md:z-auto md:p-0 md:pt-8 md:mt-8">
                <Button
                 type="button"
                 variant="outline"
                 onClick={prev}
                 disabled={currentStep === 0 || isPending}
+                className="flex-1 md:flex-none"
               >
                 {t('back')}
               </Button>
@@ -828,13 +916,15 @@ export function BookingWizard({
                 type="button" 
                 onClick={next}
                 disabled={isPending}
-                className="bg-indigo-600 hover:bg-indigo-700 font-semibold"
+                className="bg-indigo-600 hover:bg-indigo-700 font-semibold flex-1 md:flex-none"
               >
                 {currentStep === wizardSteps.length - 1 
                   ? (isPending ? t('processing') : t('confirmBooking')) 
                   : t('continue')}
               </Button>
             </div>
+            {/* Spacer to prevent sticky bar from overlapping form content on mobile */}
+            <div className="h-20 md:h-0" />
           </form>
         </Form>
       </div>

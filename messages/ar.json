@@ -210,7 +210,8 @@
     "back": "رجوع",
     "processing": "جاري المعالجة...",
     "confirmBooking": "تأكيد الحجز",
-    "continue": "متابعة"
+    "continue": "متابعة",
+    "of": "من"
   },
   "CustomerDashboard": {
     "myDashboard": "لوحة التحكم الخاصة بي",
