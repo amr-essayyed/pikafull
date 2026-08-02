@@ -13,7 +13,7 @@ export const bookingSchema = z.object({
   
   extras: z.array(z.string()).default([]),
   
-  scheduledDate: z.date(),
+  scheduledDate: z.date({ message: "Please select a date." }),
   scheduledTime: z.string().min(1, "Please select a time."),
   
   addressLine1: z.string().min(5, "Address is required"),

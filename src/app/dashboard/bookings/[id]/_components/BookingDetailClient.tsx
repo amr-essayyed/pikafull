@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { assignEmployeeToBooking, updateBookingStatus } from "@/actions/bookings"
-import { updateBookingStatus as updateStatusAction } from "@/actions/queries"
+import { getWhatsAppShareUrl, formatBookingWhatsAppMessage } from "@/lib/whatsapp"
 import { 
   ArrowLeft, 
   Calendar, 
@@ -27,7 +27,8 @@ import {
   Sparkles, 
   UserCheck, 
   CheckCircle2, 
-  Loader2 
+  Loader2,
+  MessageCircle
 } from "lucide-react"
 import { useTranslations } from "next-intl"
 
@@ -83,9 +84,16 @@ export function BookingDetailClient({ booking: initialBooking, employees }: Book
   const handleStatusChange = (newStatus: string) => {
     startStatusTransition(async () => {
       try {
-        await updateStatusAction(booking.id, newStatus)
-        setCurrentStatus(newStatus)
-        setBooking((prev: any) => ({ ...prev, status: newStatus }))
+        const res = await updateBookingStatus(booking.id, newStatus)
+        if (res.error) {
+          setFeedback(res.error)
+        } else {
+          setCurrentStatus(newStatus)
+          setBooking((prev: any) => ({ ...prev, status: newStatus }))
+          if (newStatus === "confirmed" || newStatus === "assigned") {
+            setFeedback(`Status updated to ${newStatus}. WhatsApp notification triggered.`)
+          }
+        }
       } catch (err: any) {
         setFeedback(err?.message || "Failed to update status")
       }
@@ -129,7 +137,7 @@ export function BookingDetailClient({ booking: initialBooking, employees }: Book
           <Select
             disabled={isUpdatingStatus}
             value={currentStatus}
-            onValueChange={handleStatusChange}
+            onValueChange={(val) => val && handleStatusChange(val)}
           >
             <SelectTrigger className="w-[150px] h-9 text-xs">
               <SelectValue />
@@ -137,7 +145,7 @@ export function BookingDetailClient({ booking: initialBooking, employees }: Book
             <SelectContent>
               {["pending", "confirmed", "assigned", "on_the_way", "in_progress", "completed", "cancelled", "paid"].map((st) => (
                 <SelectItem key={st} value={st}>
-                  {t(`status_${st}`) || st.replace("_", " ")}
+                  {t.has(`status_${st}`) ? t(`status_${st}`) : st.replace(/_/g, " ")}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -185,7 +193,7 @@ export function BookingDetailClient({ booking: initialBooking, employees }: Book
                     </div>
                   </div>
                   <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                    {t('assigned')}
+                    {t.has('assigned') ? t('assigned') : (t.has('status_assigned') ? t('status_assigned') : 'Assigned')}
                   </Badge>
                 </div>
               ) : (
@@ -203,7 +211,7 @@ export function BookingDetailClient({ booking: initialBooking, employees }: Book
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                 <Select
                   value={selectedEmployeeId}
-                  onValueChange={setSelectedEmployeeId}
+                  onValueChange={(val) => val && setSelectedEmployeeId(val)}
                 >
                   <SelectTrigger className="flex-1">
                     <span className="truncate font-medium">
@@ -344,10 +352,35 @@ export function BookingDetailClient({ booking: initialBooking, employees }: Book
               )}
 
               {customerProfile?.phone && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Phone className="h-4 w-4 shrink-0 text-slate-400" />
-                  <a href={`tel:${customerProfile.phone}`} className="hover:underline text-xs">
-                    {customerProfile.phone}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Phone className="h-4 w-4 shrink-0 text-slate-400" />
+                    <a href={`tel:${customerProfile.phone}`} className="hover:underline text-xs">
+                      {customerProfile.phone}
+                    </a>
+                  </div>
+                  <a
+                    href={getWhatsAppShareUrl(
+                      customerProfile.phone,
+                      formatBookingWhatsAppMessage({
+                        toPhone: customerProfile.phone,
+                        customerName: customerProfile.full_name,
+                        bookingId: booking.id,
+                        bookingNumber: booking.booking_number ? String(booking.booking_number) : undefined,
+                        status: currentStatus,
+                        serviceTitle: booking.services?.name || booking.services?.title,
+                        scheduledDate: booking.scheduled_date,
+                        scheduledTime: booking.scheduled_time,
+                        address: address ? `${address.address_line_1}${address.city ? `, ${address.city}` : ""}` : undefined,
+                        employeeName: booking.employees?.profiles?.full_name || employeeProfile?.full_name,
+                      })
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-all w-full justify-center shadow-sm hover:shadow"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    Send WhatsApp Notification
                   </a>
                 </div>
               )}

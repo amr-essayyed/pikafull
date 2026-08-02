@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { updateBookingStatus as updateBookingStatusAction } from "@/actions/bookings"
 
 // ── Public Queries (no auth required) ──
 
@@ -167,23 +168,28 @@ export async function getCurrentCustomerProfile() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, phone")
+    .eq("id", user.id)
+    .maybeSingle()
+
   const { data: customer } = await supabase
     .from("customers")
     .select(`
       id,
-      profiles ( id, full_name, email, phone ),
       addresses ( id, address_line_1, city, postal_code )
     `)
     .eq("profile_id", user.id)
     .maybeSingle()
 
-  if (!customer) return null
-
   const rawAddresses = (customer as any)?.addresses
   const firstAddr = Array.isArray(rawAddresses) ? rawAddresses[0] : rawAddresses
   return {
-    id: (customer as any).id,
-    phone: (customer as any).profiles?.phone || "",
+    id: (customer as any)?.id || "",
+    fullName: (profile as any)?.full_name || user.user_metadata?.full_name || "",
+    email: (profile as any)?.email || user.email || "",
+    phone: (profile as any)?.phone || "",
     addressLine1: (firstAddr as any)?.address_line_1 || "",
     city: (firstAddr as any)?.city || "",
   }
@@ -203,12 +209,7 @@ export async function getAllEmployees() {
 }
 
 export async function updateBookingStatus(bookingId: string, status: string) {
-  const supabase = await createClient()
-  const { error } = await supabase
-    .from("bookings")
-    .update({ status })
-    .eq("id", bookingId)
-  if (error) throw error
+  return await updateBookingStatusAction(bookingId, status)
 }
 
 export async function updateCompanySettings(settings: Record<string, any>) {

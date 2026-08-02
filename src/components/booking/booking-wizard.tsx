@@ -38,6 +38,9 @@ interface BookingWizardProps {
   isAuthenticated?: boolean
   initialServiceId?: string
   initialCustomerData?: {
+    id?: string
+    fullName?: string
+    email?: string
     phone?: string
     addressLine1?: string
     city?: string
@@ -66,9 +69,9 @@ export function BookingWizard({
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema) as any,
     defaultValues: {
-      customerId: "",
-      fullName: "",
-      email: "",
+      customerId: initialCustomerData?.id || "",
+      fullName: initialCustomerData?.fullName || "",
+      email: initialCustomerData?.email || "",
       serviceId: initialServiceId || "",
       propertyType: "apartment",
       bedrooms: 1,
@@ -88,6 +91,9 @@ export function BookingWizard({
   // Auto-populate customer details on mount if initialCustomerData is available
   React.useEffect(() => {
     if (initialCustomerData) {
+      if (initialCustomerData.id) form.setValue("customerId", initialCustomerData.id)
+      if (initialCustomerData.fullName) form.setValue("fullName", initialCustomerData.fullName)
+      if (initialCustomerData.email) form.setValue("email", initialCustomerData.email)
       if (initialCustomerData.addressLine1) form.setValue("addressLine1", initialCustomerData.addressLine1)
       if (initialCustomerData.city) form.setValue("city", initialCustomerData.city)
       if (initialCustomerData.phone) form.setValue("phone", initialCustomerData.phone)
@@ -244,7 +250,18 @@ export function BookingWizard({
     if (currentStep < wizardSteps.length - 1) {
       setCurrentStep(step => step + 1)
     } else {
-      await form.handleSubmit(processForm)()
+      await form.handleSubmit(
+        processForm,
+        (errors) => {
+          console.error("Booking form validation errors:", errors)
+          const errorKeys = Object.keys(errors)
+          if (errorKeys.length > 0) {
+            const firstKey = errorKeys[0]
+            const errObj = errors[firstKey as keyof typeof errors]
+            setError(errObj?.message ? String(errObj.message) : "Please fill in all required fields.")
+          }
+        }
+      )()
     }
   }
 

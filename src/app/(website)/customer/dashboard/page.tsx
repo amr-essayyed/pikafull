@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getTranslations } from "next-intl/server"
+import { CancelBookingDialog } from "@/components/booking/cancel-booking-dialog"
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
@@ -121,9 +122,16 @@ export default async function CustomerDashboardPage() {
                       </div>
                     </div>
                     
-                    <div className="text-left md:text-right rtl:md:text-left">
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{t('totalPrice')}</p>
-                      <p className="text-3xl font-bold text-slate-900 dark:text-white">£{Number(booking.total_price).toFixed(2)}</p>
+                    <div className="flex flex-col md:items-end justify-between gap-4">
+                      <div className="text-left md:text-right rtl:md:text-left">
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{t('totalPrice')}</p>
+                        <p className="text-3xl font-bold text-slate-900 dark:text-white">£{Number(booking.total_price).toFixed(2)}</p>
+                      </div>
+                      <CancelBookingDialog
+                        bookingId={booking.id}
+                        bookingNumber={booking.booking_number}
+                        status={booking.status}
+                      />
                     </div>
                   </div>
                 </CardContent>

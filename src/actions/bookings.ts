@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { bookingSchema, type BookingFormData } from "@/validators/booking"
 import { Resend } from "resend"
+import { sendWhatsAppNotification } from "@/lib/whatsapp"
+import { sendInAppNotification, getArabicInAppNotificationContent } from "@/lib/notifications"
 
 export async function createBooking(data: BookingFormData) {
   const result = bookingSchema.safeParse(data)
@@ -30,15 +32,19 @@ export async function createBooking(data: BookingFormData) {
     isAdminOrStaff = role === "owner" || role === "staff" || role === "admin"
   }
 
-  // Case A: Admin/Staff selected an existing customer ID
+  // Case A: Customer ID supplied (Admin selecting customer OR Customer booking for themselves)
   if (data.customerId) {
-    if (!isAdminOrStaff) {
-      return { error: "You are not authorized to create bookings for other customers." }
-    }
-    customerId = data.customerId
-    const { data: custObj } = await admin.from("customers").select("profile_id").eq("id", customerId).single()
+    const { data: custObj } = await admin.from("customers").select("profile_id").eq("id", data.customerId).maybeSingle()
     if (custObj) {
+      if (!isAdminOrStaff && user?.id !== (custObj as any).profile_id) {
+        return { error: "You are not authorized to create bookings for other customers." }
+      }
+      customerId = data.customerId
       targetUserId = (custObj as any).profile_id
+    } else {
+      if (!isAdminOrStaff) {
+        return { error: "You are not authorized to create bookings for other customers." }
+      }
     }
   } 
   // Case B: Admin/Staff creating a booking for a new customer OR Guest booking on public site
@@ -144,8 +150,16 @@ export async function createBooking(data: BookingFormData) {
           await resend.emails.send({
             from: 'Pikafull <noreply@4teq.store>',
             to: cleanedEmail,
-            subject: 'Welcome to Pikafull! Your Account & Booking Details',
-            html: `<p>Hello ${data.fullName},</p><p>Thank you for booking with Pikafull!</p><p>An account has been automatically created for you to track your booking.</p><p>Your login email is: <strong>${cleanedEmail}</strong><br/>Your generated password is: <strong>${generatedPassword}</strong></p><p>Please log in and change your password as soon as possible.</p>`
+            subject: 'مرحباً بك في بيكافول! تفاصيل حسابك وحجزك',
+            html: `<div dir="rtl" style="font-family: Arial, sans-serif; text-align: right; line-height: 1.6;">
+              <h2>مرحباً ${data.fullName}! 👋</h2>
+              <p>شكراً لطلبك الحجز مع بيكافول (Pikafull)!</p>
+              <p>تم إنشاء حساب جديد لك تلقائياً لمتابعة حالة حجزك ورصيدك.</p>
+              <p><strong>بيانات الدخول:</strong><br/>
+              البريد الإلكتروني: <strong>${cleanedEmail}</strong><br/>
+              كلمة المرور المؤقتة: <strong>${generatedPassword}</strong></p>
+              <p>يرجى تسجيل الدخول وتغيير كلمة المرور الخاصة بك في أقرب وقت.</p>
+            </div>`
           })
         }
       } catch (emailErr) {
@@ -265,6 +279,13 @@ export async function createBooking(data: BookingFormData) {
       }))
 
       await admin.from("booking_extras").insert(extrasToInsert as any)
+    }
+
+    // Trigger WhatsApp & In-App pending notifications
+    try {
+      await triggerBookingWhatsAppNotification((booking as any).id, "pending")
+    } catch (notifErr) {
+      console.error("Failed to send booking pending notifications:", notifErr)
     }
 
     revalidatePath("/customer/dashboard")
@@ -435,12 +456,11 @@ export async function assignEmployeeToBooking(bookingId: string, employeeId: str
     newStatus = "pending"
   }
 
-  const { error: updateError } = await supabase
-    .from("bookings")
+  const { error: updateError } = await (supabase.from("bookings") as any)
     .update({
       employee_id: employeeId || null,
       status: newStatus,
-    } as any)
+    })
     .eq("id", bookingId)
 
   if (updateError) {
@@ -459,11 +479,280 @@ export async function assignEmployeeToBooking(bookingId: string, employeeId: str
     console.error("Failed to write booking history:", err)
   }
 
+  // Trigger WhatsApp notification if an employee is assigned or status transitions to assigned/confirmed
+  if (employeeId || newStatus === "assigned" || newStatus === "confirmed") {
+    try {
+      await triggerBookingWhatsAppNotification(bookingId, newStatus)
+    } catch (waErr) {
+      console.error("Failed to send WhatsApp notification on assignment:", waErr)
+    }
+  }
+
   revalidatePath("/dashboard")
   revalidatePath("/dashboard/bookings")
   revalidatePath(`/dashboard/bookings/${bookingId}`)
 
   return { success: true, status: newStatus }
 }
+
+export async function updateBookingStatus(bookingId: string, newStatus: string) {
+  const supabase = await createClient()
+  const admin = createAdminClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: "Authentication required" }
+  }
+
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+  const role = (profile as any)?.role
+  if (role !== "owner" && role !== "staff" && role !== "admin") {
+    return { error: "Not authorized to update booking status" }
+  }
+
+  const { data: currentBooking, error: fetchErr } = await admin
+    .from("bookings")
+    .select("status")
+    .eq("id", bookingId)
+    .single()
+
+  if (fetchErr || !currentBooking) {
+    return { error: "Booking not found" }
+  }
+
+  const oldStatus = (currentBooking as any).status
+
+  const { error: updateError } = await (admin.from("bookings") as any)
+    .update({ status: newStatus })
+    .eq("id", bookingId)
+
+  if (updateError) {
+    return { error: updateError.message }
+  }
+
+  try {
+    await (admin.from("booking_history") as any).insert({
+      booking_id: bookingId,
+      old_status: oldStatus,
+      new_status: newStatus,
+      changed_by: user.id,
+      notes: `Status updated to ${newStatus}`,
+    })
+  } catch (err) {
+    console.error("Failed to write booking history:", err)
+  }
+
+  try {
+    await triggerBookingWhatsAppNotification(bookingId, newStatus)
+  } catch (waErr) {
+    console.error("Failed to send WhatsApp notification on status update:", waErr)
+  }
+
+  revalidatePath("/dashboard")
+  revalidatePath("/dashboard/bookings")
+  revalidatePath(`/dashboard/bookings/${bookingId}`)
+
+  return { success: true, status: newStatus }
+}
+
+async function triggerBookingWhatsAppNotification(bookingId: string, status: string) {
+  const admin = createAdminClient()
+
+  const { data: booking, error } = await admin
+    .from("bookings")
+    .select(`
+      id,
+      booking_number,
+      scheduled_date,
+      scheduled_time,
+      status,
+      customers (
+        profile_id,
+        profiles (
+          full_name,
+          phone
+        )
+      ),
+      employees (
+        profiles (
+          full_name
+        )
+      ),
+      services (
+        name
+      ),
+      addresses (
+        address_line_1,
+        city
+      )
+    `)
+    .eq("id", bookingId)
+    .single()
+
+  if (error || !booking) {
+    console.warn("[WhatsApp Notification] Could not fetch booking details for ID:", bookingId)
+    return
+  }
+
+  const custProfile = (booking as any)?.customers?.profiles
+  const custUserId = (booking as any)?.customers?.profile_id
+  const customerPhone = custProfile?.phone
+  const customerName = custProfile?.full_name
+
+  const empProfile = (booking as any)?.employees?.profiles
+  const employeeName = empProfile?.full_name
+  const serviceObj = (booking as any)?.services
+  const serviceTitle = serviceObj?.name
+  const addrObj = (booking as any)?.addresses
+  const addressStr = addrObj ? `${addrObj.address_line_1 || ""}${addrObj.city ? `, ${addrObj.city}` : ""}` : undefined
+
+  // 1. Send In-App Notification if customer profile exists
+  if (custUserId) {
+    try {
+      const inAppContent = getArabicInAppNotificationContent(
+        status,
+        (booking as any).booking_number ? String((booking as any).booking_number) : undefined,
+        serviceTitle,
+        employeeName
+      )
+      await sendInAppNotification({
+        userId: custUserId,
+        title: inAppContent.title,
+        message: inAppContent.message,
+        type: "booking",
+        actionUrl: "/customer/dashboard",
+      })
+    } catch (inAppErr) {
+      console.error("Failed to create in-app notification:", inAppErr)
+    }
+  }
+
+  // 2. Send WhatsApp Notification if customer phone exists
+  if (!customerPhone) {
+    console.log(`[WhatsApp Notification] Customer has no phone number attached for booking ${bookingId}`)
+    return
+  }
+
+  await sendWhatsAppNotification({
+    toPhone: customerPhone,
+    customerName: customerName || "Customer",
+    bookingId: (booking as any).id,
+    bookingNumber: (booking as any).booking_number ? String((booking as any).booking_number) : undefined,
+    status: status,
+    serviceTitle,
+    scheduledDate: (booking as any).scheduled_date,
+    scheduledTime: (booking as any).scheduled_time,
+    address: addressStr,
+    employeeName,
+  })
+}
+
+
+export async function cancelBookingByCustomer(bookingId: string, reason?: string) {
+  const supabase = await createClient()
+  const admin = createAdminClient()
+
+  // 1. Authenticate user
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: "Authentication required." }
+  }
+
+  // 2. Fetch customer profile for user
+  const { data: customer } = await admin
+    .from("customers")
+    .select("id")
+    .eq("profile_id", user.id)
+    .single()
+
+  if (!customer) {
+    return { error: "Customer profile not found." }
+  }
+
+  // 3. Fetch booking
+  const { data: booking, error: fetchErr } = await admin
+    .from("bookings")
+    .select("id, status, scheduled_date, scheduled_time, customer_id")
+    .eq("id", bookingId)
+    .single()
+
+  if (fetchErr || !booking) {
+    return { error: "Booking not found." }
+  }
+
+  // Verify ownership
+  if ((booking as any).customer_id !== (customer as any).id) {
+    return { error: "You are not authorized to cancel this booking." }
+  }
+
+  const curStatus = (booking as any).status
+  if (curStatus === "cancelled") {
+    return { error: "Booking is already cancelled." }
+  }
+
+  const cancellableStatuses = ["pending", "confirmed", "assigned"]
+  if (!cancellableStatuses.includes(curStatus)) {
+    return { error: "This booking cannot be cancelled in its current state." }
+  }
+
+  // 4. Check cancellation lead time rules from company_settings
+  const { data: companySettings } = await admin
+    .from("company_settings")
+    .select("cancellation_hours")
+    .single()
+
+  const cancellationHours = (companySettings as any)?.cancellation_hours ?? 48
+
+  if ((booking as any).scheduled_date && (booking as any).scheduled_time) {
+    const scheduledDateTime = new Date(`${(booking as any).scheduled_date}T${(booking as any).scheduled_time}`)
+    const now = new Date()
+    const diffInMs = scheduledDateTime.getTime() - now.getTime()
+    const diffInHours = diffInMs / (1000 * 60 * 60)
+
+    if (diffInHours < cancellationHours) {
+      return {
+        error: `Bookings cannot be cancelled online within ${cancellationHours} hours of the scheduled time. Please contact support.`,
+        cancellationHours,
+      }
+    }
+  }
+
+  // 5. Perform update using admin client
+  const { error: updateErr } = await (admin.from("bookings") as any)
+    .update({
+      status: "cancelled",
+    })
+    .eq("id", bookingId)
+
+  if (updateErr) {
+    return { error: updateErr.message || "Failed to cancel booking." }
+  }
+
+  // 6. Record history
+  try {
+    await (admin.from("booking_history") as any).insert({
+      booking_id: bookingId,
+      old_status: curStatus,
+      new_status: "cancelled",
+      changed_by: user.id,
+      notes: reason ? `Cancelled by customer: ${reason}` : "Cancelled by customer",
+    })
+  } catch (histErr) {
+    console.error("Failed to write booking history:", histErr)
+  }
+
+  try {
+    await triggerBookingWhatsAppNotification(bookingId, "cancelled")
+  } catch (waErr) {
+    console.error("Failed to send cancellation notification:", waErr)
+  }
+
+  revalidatePath("/customer/dashboard")
+  revalidatePath("/dashboard/bookings")
+  revalidatePath(`/dashboard/bookings/${bookingId}`)
+
+  return { success: true }
+}
+
 
 
