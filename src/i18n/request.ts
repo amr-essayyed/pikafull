@@ -6,7 +6,7 @@ export default getRequestConfig(async () => {
   let locale = cookieStore.get('NEXT_LOCALE')?.value;
 
   if (!locale || !['en', 'ar'].includes(locale)) {
-    locale = 'en';
+    locale = 'ar';
   }
  
   return {
