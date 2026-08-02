@@ -322,7 +322,7 @@ export function BookingWizard({
           <div className="flex items-center gap-2">
             <span className="text-base">💡</span>
             <span>
-              <strong>Booking as Guest:</strong> Your customer account will be created automatically when you confirm your booking.
+              <strong>{t('guestBookingTitle')}</strong> {t('guestBookingDesc')}
             </span>
           </div>
           <Button
@@ -332,7 +332,7 @@ export function BookingWizard({
             className="border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900 text-xs shrink-0"
             onClick={() => window.location.href = "/login?redirectTo=/book"}
           >
-            Sign In Instead
+            {t('signInInstead')}
           </Button>
         </div>
       )}
@@ -779,8 +779,8 @@ export function BookingWizard({
                 {!isAuthenticated && (
                   <div className="space-y-4 border-b pb-6">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-lg">Contact & Account Details</h3>
-                      <span className="text-xs text-muted-foreground">Auto account creation</span>
+                      <h3 className="font-semibold text-lg">{t('contactAccountDetails')}</h3>
+                      <span className="text-xs text-muted-foreground">{t('autoAccountCreation')}</span>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -789,7 +789,7 @@ export function BookingWizard({
                         name="fullName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Full Name</FormLabel>
+                            <FormLabel>{t('fullName')}</FormLabel>
                             <FormControl>
                               <Input placeholder="John Doe" {...field} />
                             </FormControl>
@@ -802,7 +802,7 @@ export function BookingWizard({
                         name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Email Address</FormLabel>
+                            <FormLabel>{t('email')}</FormLabel>
                             <FormControl>
                               <Input type="email" placeholder="john@example.com" {...field} />
                             </FormControl>
@@ -815,7 +815,7 @@ export function BookingWizard({
                     <div className="bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 rounded-lg p-3.5 flex items-start gap-2.5 text-xs text-indigo-900 dark:text-indigo-200">
                       <span className="text-base leading-none">💡</span>
                       <div>
-                        <strong>Automatic Account Creation:</strong> A customer account will be created automatically for this email. We will email your login password to you upon confirmation.
+                        <strong>{t('autoAccountCreationNotice')}</strong> {t('autoAccountCreationDesc')}
                       </div>
                     </div>
                   </div>

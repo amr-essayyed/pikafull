@@ -212,7 +212,14 @@
     "processing": "جاري المعالجة...",
     "confirmBooking": "تأكيد الحجز",
     "continue": "متابعة",
-    "of": "من"
+    "of": "من",
+    "guestBookingTitle": "الحجز كزائر:",
+    "guestBookingDesc": "سيتم إنشاء حساب العميل الخاص بك تلقائيًا عند تأكيد الحجز.",
+    "signInInstead": "تسجيل الدخول بدلاً من ذلك",
+    "contactAccountDetails": "تفاصيل الاتصال والحساب",
+    "autoAccountCreation": "إنشاء حساب تلقائي",
+    "autoAccountCreationNotice": "إنشاء حساب تلقائي:",
+    "autoAccountCreationDesc": "سيتم إنشاء حساب عميل تلقائيًا لهذا البريد الإلكتروني. سنرسل لك كلمة مرور الدخول عبر البريد الإلكتروني عند التأكيد."
   },
   "CustomerDashboard": {
     "myDashboard": "لوحة التحكم الخاصة بي",

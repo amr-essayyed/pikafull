@@ -212,7 +212,14 @@
     "processing": "Processing...",
     "confirmBooking": "Confirm Booking",
     "continue": "Continue",
-    "of": "of"
+    "of": "of",
+    "guestBookingTitle": "Booking as Guest:",
+    "guestBookingDesc": "Your customer account will be created automatically when you confirm your booking.",
+    "signInInstead": "Sign In Instead",
+    "contactAccountDetails": "Contact & Account Details",
+    "autoAccountCreation": "Auto account creation",
+    "autoAccountCreationNotice": "Automatic Account Creation:",
+    "autoAccountCreationDesc": "A customer account will be created automatically for this email. We will email your login password to you upon confirmation."
   },
   "CustomerDashboard": {
     "myDashboard": "My Dashboard",
