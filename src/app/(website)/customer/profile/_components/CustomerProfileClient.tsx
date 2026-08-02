@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { CitySelect } from "@/components/ui/city-select"
 import {
   User,
   Lock,
@@ -61,6 +62,7 @@ export function CustomerProfileClient({ profile, customer, address }: CustomerPr
 
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [cityValue, setCityValue] = useState(address?.city || "")
 
   const memberDate = profile.created_at
     ? new Date(profile.created_at).toLocaleDateString(undefined, {
@@ -298,11 +300,11 @@ export function CustomerProfileClient({ profile, customer, address }: CustomerPr
                       <Label htmlFor="city" className="text-xs font-medium">
                         {t("city")}
                       </Label>
-                      <Input
+                      <CitySelect
                         id="city"
                         name="city"
-                        defaultValue={address?.city || ""}
-                        placeholder={t("cityPlaceholder")}
+                        value={cityValue}
+                        onChange={setCityValue}
                       />
                     </div>
                   </div>

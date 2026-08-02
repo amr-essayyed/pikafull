@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import Link from "next/link"
 
 export const metadata: Metadata = {
   title: "Authentication - SparkleClean Pro",
@@ -18,8 +19,8 @@ export default function AuthLayout({
         </div>
       </div>
       <div className="hidden lg:flex flex-col justify-center items-center bg-indigo-600 text-white p-12">
-        <div className="max-w-md space-y-6 text-center">
-          <div className="mx-auto w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-8 backdrop-blur-sm">
+        <Link href="/" className="max-w-md space-y-6 text-center group cursor-pointer">
+          <div className="mx-auto w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-8 backdrop-blur-sm group-hover:scale-105 transition-transform">
             <span className="text-3xl">✨</span>
           </div>
           <h2 className="text-4xl font-bold tracking-tight">SparkleClean Pro</h2>
@@ -27,7 +28,7 @@ export default function AuthLayout({
             Professional cleaning services at your fingertips. Manage your bookings,
             view schedules, and stay in control.
           </p>
-        </div>
+        </Link>
       </div>
     </div>
   )

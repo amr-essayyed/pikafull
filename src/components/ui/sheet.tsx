@@ -41,10 +41,12 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  closeButtonClassName,
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  closeButtonClassName?: string
 }) {
   return (
     <SheetPortal>
@@ -65,7 +67,11 @@ function SheetContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-3 right-3"
+                className={cn(
+                  "absolute top-3.5",
+                  side === "left" ? "left-4" : "right-3.5",
+                  closeButtonClassName
+                )}
                 size="icon-sm"
               />
             }

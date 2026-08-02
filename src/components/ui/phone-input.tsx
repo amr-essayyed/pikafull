@@ -68,7 +68,7 @@ export function PhoneInput({
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      <div className="flex gap-2">
+      <div className="flex gap-2" dir="ltr">
         {/* Country Code Select */}
         <div className="relative shrink-0">
           <select

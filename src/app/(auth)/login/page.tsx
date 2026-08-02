@@ -5,6 +5,7 @@ import Link from "next/link"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { useTranslations } from "next-intl"
+import { ArrowLeft } from "lucide-react"
 
 import { login } from "@/actions/auth"
 import { loginSchema, type LoginFormData } from "@/validators/auth"
@@ -58,6 +59,16 @@ function LoginForm() {
 
   return (
     <>
+      <div>
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
+          <span>{tAuth('backToHome')}</span>
+        </Link>
+      </div>
+
       <div className="text-center">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
           {tAuth('loginTitle')}

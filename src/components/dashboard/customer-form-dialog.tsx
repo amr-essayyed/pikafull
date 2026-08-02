@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { PhoneInput } from "@/components/ui/phone-input"
+import { CitySelect } from "@/components/ui/city-select"
 import { parsePhoneWithCountryCode, validatePhoneNumber } from "@/lib/phone-validation"
 
 interface CustomerFormDialogProps {
@@ -34,10 +35,12 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
   const firstAddress = Array.isArray(customer?.addresses) ? customer.addresses[0] : customer?.addresses
 
   const [phoneValue, setPhoneValue] = useState<string>("")
+  const [cityValue, setCityValue] = useState<string>("")
 
   useEffect(() => {
     setPhoneValue(profile?.phone || "")
-  }, [profile?.phone])
+    setCityValue(firstAddress?.city || "")
+  }, [profile?.phone, firstAddress?.city])
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -136,7 +139,12 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
 
               <div className="space-y-2">
                 <Label htmlFor="city">City (Optional)</Label>
-                <Input id="city" name="city" defaultValue={firstAddress?.city} placeholder="City name" />
+                <CitySelect
+                  id="city"
+                  name="city"
+                  value={cityValue}
+                  onChange={setCityValue}
+                />
               </div>
             </div>
 

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { PhoneInput } from "@/components/ui/phone-input"
+import { CitySelect } from "@/components/ui/city-select"
 import { bookingSchema, type BookingFormData } from "@/validators/booking"
 import { createBooking, getUnavailableTimeslots } from "@/actions/bookings"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -843,7 +844,10 @@ export function BookingWizard({
                         <FormItem>
                           <FormLabel>{t('city')}</FormLabel>
                           <FormControl>
-                            <Input placeholder="Cairo" {...field} />
+                            <CitySelect
+                              value={field.value || ""}
+                              onChange={field.onChange}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

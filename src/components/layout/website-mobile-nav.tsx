@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useLocale } from "next-intl"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -33,10 +34,13 @@ interface WebsiteMobileNavProps {
 
 export function WebsiteMobileNav({ isLoggedIn, role, t }: WebsiteMobileNavProps) {
   const [open, setOpen] = useState(false)
+  const locale = useLocale()
 
   const handleLinkClick = () => {
     setOpen(false)
   }
+
+  const side = locale === "ar" ? "left" : "right"
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -48,7 +52,7 @@ export function WebsiteMobileNav({ isLoggedIn, role, t }: WebsiteMobileNavProps)
           </Button>
         }
       />
-      <SheetContent side="right" className="w-[300px] sm:w-[350px] p-6 flex flex-col justify-between">
+      <SheetContent side={side} className="w-[300px] sm:w-[350px] p-6 flex flex-col justify-between">
         <div>
           <SheetHeader className="p-0 pb-6 text-left rtl:text-right">
             <SheetTitle className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-emerald-500 bg-clip-text text-transparent">

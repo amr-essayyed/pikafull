@@ -27,7 +27,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { logout } from "@/actions/auth"
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 
 const navItemsKeys = [
   { titleKey: "dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -45,6 +45,7 @@ export function DashboardMobileNav() {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
   const t = useTranslations("AdminSidebar")
+  const locale = useLocale()
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard"
@@ -54,6 +55,9 @@ export function DashboardMobileNav() {
   const handleLinkClick = () => {
     setOpen(false)
   }
+
+  const side = locale === "ar" ? "left" : "right"
+  const closeButtonClassName = side === "left" ? "top-[30px] left-[30px]" : "top-[30px] right-[30px]"
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -65,7 +69,11 @@ export function DashboardMobileNav() {
           </Button>
         }
       />
-      <SheetContent side="left" className="w-[280px] p-6 flex flex-col justify-between">
+      <SheetContent
+        side={side}
+        closeButtonClassName={closeButtonClassName}
+        className="w-[280px] p-6 flex flex-col justify-between"
+      >
         <div className="flex flex-col h-full">
           <SheetHeader className="p-0 pb-6 text-left rtl:text-right">
             <SheetTitle className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-emerald-500 bg-clip-text text-transparent">

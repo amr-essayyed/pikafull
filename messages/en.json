@@ -47,6 +47,7 @@
     "sendingLinkButton": "Sending link...",
     "rememberPassword": "Remember your password?",
     "backToLogin": "Back to login",
+    "backToHome": "Back to Home",
     "checkEmailTitle": "Check your email",
     "checkEmailSubtitle": "We have sent a password reset link to ",
     "resetTitle": "Set new password",
