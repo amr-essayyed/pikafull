@@ -363,6 +363,8 @@ async function processStateMachine(params: {
       }
 
       // Revalidate Dashboard paths
+      revalidatePath("/dashboard")
+      revalidatePath("/dashboard/bookings")
       revalidatePath("/admin")
       revalidatePath("/admin/bookings")
 
