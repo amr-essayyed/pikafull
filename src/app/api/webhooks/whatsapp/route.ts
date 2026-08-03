@@ -134,10 +134,16 @@ async function processStateMachine(params: {
   const { phone, senderName, userText, currentStep, formData } = params
   const admin = createAdminClient()
 
+  // Force reset if user explicitly requests to restart flow
+  let activeStep = currentStep
+  if (userText === "حجز" || userText === "ابدأ" || userText.toLowerCase() === "start" || userText.toLowerCase() === "booking") {
+    activeStep = "IDLE"
+  }
+
   // ----------------------------------------------------
   // STEP: IDLE -> Start Booking Flow & Show Services List
   // ----------------------------------------------------
-  if (currentStep === "IDLE" || userText === "حجز" || userText.includes("خدمة") || userText === "1") {
+  if (activeStep === "IDLE") {
     // Fetch active services from DB
     const { data: services } = await (admin.from("services") as any)
       .select("id, name, base_price")
@@ -173,7 +179,7 @@ async function processStateMachine(params: {
   // ----------------------------------------------------
   // STEP: AWAITING_SERVICE -> Store Service & Ask Name
   // ----------------------------------------------------
-  if (currentStep === "AWAITING_SERVICE") {
+  if (activeStep === "AWAITING_SERVICE") {
     const availableServices: any[] = formData.availableServices || []
     const chosenIndex = parseInt(userText.trim(), 10)
 
@@ -215,7 +221,7 @@ async function processStateMachine(params: {
   // ----------------------------------------------------
   // STEP: AWAITING_NAME -> Store Name & Ask City
   // ----------------------------------------------------
-  if (currentStep === "AWAITING_NAME") {
+  if (activeStep === "AWAITING_NAME") {
     const nameInput = userText.trim()
     if (nameInput.length < 2) {
       await sendWhatsAppTextMessage(phone, `⚠️ يرجى كتابة اسم صحيح لتأكيد الحجز:`)
@@ -230,7 +236,7 @@ async function processStateMachine(params: {
   // ----------------------------------------------------
   // STEP: AWAITING_CITY -> Store City & Ask Address
   // ----------------------------------------------------
-  if (currentStep === "AWAITING_CITY") {
+  if (activeStep === "AWAITING_CITY") {
     let chosenCity = userText.trim()
     if (userText === "1") chosenCity = "الرياض"
     else if (userText === "2") chosenCity = "جدة"
@@ -248,7 +254,7 @@ async function processStateMachine(params: {
   // ----------------------------------------------------
   // STEP: AWAITING_ADDRESS -> Store Address & Ask Date/Time
   // ----------------------------------------------------
-  if (currentStep === "AWAITING_ADDRESS") {
+  if (activeStep === "AWAITING_ADDRESS") {
     const addressInput = userText.trim()
     if (addressInput.length < 3) {
       await sendWhatsAppTextMessage(phone, `⚠️ يرجى كتابة عنوان واضح وسليم:`)
@@ -281,7 +287,7 @@ async function processStateMachine(params: {
   // ----------------------------------------------------
   // STEP: AWAITING_DATETIME -> Store Date & Present Summary
   // ----------------------------------------------------
-  if (currentStep === "AWAITING_DATETIME") {
+  if (activeStep === "AWAITING_DATETIME") {
     const presetDates: any[] = formData.presetDates || []
     const chosenIndex = parseInt(userText.trim(), 10)
     const matchedPreset = presetDates.find((p) => p.index === chosenIndex)
@@ -327,7 +333,7 @@ async function processStateMachine(params: {
   // ----------------------------------------------------
   // STEP: AWAITING_CONFIRMATION -> Create Booking & Sync DB
   // ----------------------------------------------------
-  if (currentStep === "AWAITING_CONFIRMATION") {
+  if (activeStep === "AWAITING_CONFIRMATION") {
     if (userText === "1" || userText.includes("تأكيد") || userText.includes("نعم") || userText === "yes") {
       await sendWhatsAppTextMessage(phone, `⏳ جاري إرسال حجزك واعتماده بالنظام...`)
 
