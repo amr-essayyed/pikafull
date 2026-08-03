@@ -273,3 +273,73 @@ export async function sendWhatsAppOTP(phone: string, otp: string): Promise<{ suc
     return { success: false, error: err.message }
   }
 }
+
+/**
+ * Server-side function to send a plain text message over WhatsApp (Green API / UltraMsg / Meta).
+ */
+export async function sendWhatsAppTextMessage(phone: string, text: string): Promise<{ success: boolean; error?: string }> {
+  const sanitizedPhone = sanitizePhoneNumber(phone)
+  if (!sanitizedPhone) {
+    return { success: false, error: "Invalid phone number" }
+  }
+
+  console.log(`\n========================================`)
+  console.log(`📲 [WhatsApp Text Sent]`)
+  console.log(`TO: ${sanitizedPhone}`)
+  console.log(`MESSAGE:\n${text}`)
+  console.log(`========================================\n`)
+
+  const apiUrl = process.env.WHATSAPP_API_URL
+  const apiToken = process.env.WHATSAPP_API_TOKEN
+
+  if (!apiUrl || apiUrl.includes("YOUR_INSTANCE_ID")) {
+    console.warn("[WhatsApp Text] Missing or invalid WHATSAPP_API_URL.")
+    return { success: true } // Logged locally if API URL not set
+  }
+
+  try {
+    let headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+    let requestBody: any = {}
+
+    if (apiUrl.includes("green-api.com")) {
+      requestBody = {
+        chatId: `${sanitizedPhone}@c.us`,
+        message: text,
+      }
+    } else if (apiUrl.includes("ultramsg.com")) {
+      requestBody = {
+        token: apiToken,
+        to: sanitizedPhone,
+        body: text,
+      }
+    } else {
+      if (apiToken) headers["Authorization"] = `Bearer ${apiToken}`
+      requestBody = {
+        to: sanitizedPhone,
+        chatId: `${sanitizedPhone}@c.us`,
+        body: text,
+        message: text,
+      }
+    }
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      console.error("[WhatsApp Send Error]:", response.status, errText)
+      return { success: false, error: errText }
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    console.error("[WhatsApp Send Exception]:", err)
+    return { success: false, error: err.message }
+  }
+}
+
