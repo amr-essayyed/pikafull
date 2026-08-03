@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { loginSchema, registerSchema } from "@/validators/auth"
+import { loginSchema, registerSchema, adminLoginSchema } from "@/validators/auth"
 
 export async function login(formData: FormData) {
   const data = Object.fromEntries(formData.entries())
@@ -48,7 +48,7 @@ export async function login(formData: FormData) {
 
 export async function adminLogin(formData: FormData) {
   const data = Object.fromEntries(formData.entries())
-  const result = loginSchema.safeParse(data)
+  const result = adminLoginSchema.safeParse(data)
 
   if (!result.success) {
     return { error: result.error.issues[0].message }
