@@ -288,9 +288,9 @@ export function BookingWizard({
       case "Date & Time":
         return ["scheduledDate", "scheduledTime"]
       case "Address & Payment":
-        return isAuthenticated
-          ? ["addressLine1", "city", "phone", "paymentMethod"]
-          : ["fullName", "email", "addressLine1", "city", "phone", "paymentMethod"]
+        return (!isAuthenticated || !initialCustomerData?.fullName)
+          ? ["fullName", "email", "addressLine1", "city", "phone", "paymentMethod"]
+          : ["addressLine1", "city", "phone", "paymentMethod"]
       default:
         return []
     }
@@ -800,11 +800,13 @@ export function BookingWizard({
             {/* Step 4: Address & Payment */}
             {wizardSteps[currentStep].internalName === "Address & Payment" && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                {!isAuthenticated && (
+                {(!isAuthenticated || !initialCustomerData?.fullName) && (
                   <div className="space-y-4 border-b pb-6">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-lg">{t('contactAccountDetails')}</h3>
-                      <span className="text-xs text-muted-foreground">{t('autoAccountCreation')}</span>
+                      {!isAuthenticated && (
+                        <span className="text-xs text-muted-foreground">{t('autoAccountCreation')}</span>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -860,12 +862,14 @@ export function BookingWizard({
                       )}
                     />
 
-                    <div className="bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 rounded-lg p-3.5 flex items-start gap-2.5 text-xs text-indigo-900 dark:text-indigo-200">
-                      <span className="text-base leading-none">💡</span>
-                      <div>
-                        <strong>{t('autoAccountCreationNotice')}</strong> {t('autoAccountCreationDesc')}
+                    {!isAuthenticated && (
+                      <div className="bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 rounded-lg p-3.5 flex items-start gap-2.5 text-xs text-indigo-900 dark:text-indigo-200">
+                        <span className="text-base leading-none">💡</span>
+                        <div>
+                          <strong>{t('autoAccountCreationNotice')}</strong> {t('autoAccountCreationDesc')}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
@@ -901,7 +905,7 @@ export function BookingWizard({
                         </FormItem>
                       )}
                     />
-                    {isAuthenticated && (
+                    {(isAuthenticated && !!initialCustomerData?.fullName) && (
                       <FormField
                         control={form.control}
                         name="phone"

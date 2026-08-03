@@ -189,7 +189,7 @@ export async function getCurrentCustomerProfile() {
     id: (customer as any)?.id || "",
     fullName: (profile as any)?.full_name || user.user_metadata?.full_name || "",
     email: (profile as any)?.email || user.email || "",
-    phone: (profile as any)?.phone || "",
+    phone: (profile as any)?.phone || user.phone || user.user_metadata?.phone || "",
     addressLine1: (firstAddr as any)?.address_line_1 || "",
     city: (firstAddr as any)?.city || "",
   }
