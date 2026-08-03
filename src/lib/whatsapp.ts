@@ -208,7 +208,10 @@ export async function sendWhatsAppOTP(phone: string, otp: string): Promise<{ suc
     return { success: false, error: "Invalid phone number" }
   }
 
-  const messageText = `أهلاً بك في بيكافول! 👋\n\nرمز التحقق الخاص بك هو: *${otp}*\n\nيرجى عدم مشاركة هذا الرمز مع أي شخص.`
+  const messages = [
+    `أهلاً بك في بيكافول! 👋\n\nرمز التحقق الخاص بك هو بالأسفل.\nيرجى عدم مشاركة هذا الرمز مع أي شخص.`,
+    otp
+  ]
 
   console.log(`\n========================================`)
   console.log(`📲 [WhatsApp OTP Triggered]`)
@@ -228,38 +231,40 @@ export async function sendWhatsAppOTP(phone: string, otp: string): Promise<{ suc
     let headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
-    let requestBody: any = {}
+    for (const msgText of messages) {
+      let requestBody: any = {}
 
-    if (apiUrl.includes("green-api.com")) {
-      requestBody = {
-        chatId: `${sanitizedPhone}@c.us`,
-        message: messageText,
+      if (apiUrl.includes("green-api.com")) {
+        requestBody = {
+          chatId: `${sanitizedPhone}@c.us`,
+          message: msgText,
+        }
+      } else if (apiUrl.includes("ultramsg.com")) {
+        requestBody = {
+          token: apiToken,
+          to: sanitizedPhone,
+          body: msgText,
+        }
+      } else {
+        if (apiToken) headers["Authorization"] = `Bearer ${apiToken}`
+        requestBody = {
+          to: sanitizedPhone,
+          chatId: `${sanitizedPhone}@c.us`,
+          body: msgText,
+        }
       }
-    } else if (apiUrl.includes("ultramsg.com")) {
-      requestBody = {
-        token: apiToken,
-        to: sanitizedPhone,
-        body: messageText,
-      }
-    } else {
-      if (apiToken) headers["Authorization"] = `Bearer ${apiToken}`
-      requestBody = {
-        to: sanitizedPhone,
-        chatId: `${sanitizedPhone}@c.us`,
-        body: messageText,
-      }
-    }
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody),
-    })
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+      })
 
-    if (!response.ok) {
-      const errText = await response.text()
-      console.error("[WhatsApp OTP Error]:", response.status, errText)
-      return { success: false, error: errText }
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error("[WhatsApp OTP Error]:", response.status, errText)
+        return { success: false, error: errText }
+      }
     }
     
     return { success: true }
