@@ -7,6 +7,7 @@ import { bookingSchema, type BookingFormData } from "@/validators/booking"
 import { Resend } from "resend"
 import { sendWhatsAppNotification } from "@/lib/whatsapp"
 import { sendInAppNotification, getArabicInAppNotificationContent } from "@/lib/notifications"
+import { getArabicCityName } from "@/lib/cities"
 
 export async function createBooking(data: BookingFormData) {
   const result = bookingSchema.safeParse(data)
@@ -609,7 +610,7 @@ async function triggerBookingWhatsAppNotification(
   const serviceObj = (booking as any)?.services
   const serviceTitle = serviceObj?.name
   const addrObj = (booking as any)?.addresses
-  const addressStr = addrObj ? `${addrObj.address_line_1 || ""}${addrObj.city ? `, ${addrObj.city}` : ""}` : undefined
+  const addressStr = addrObj ? `${addrObj.address_line_1 || ""}${addrObj.city ? `، ${getArabicCityName(addrObj.city)}` : ""}` : undefined
 
   // 1. Send In-App Notification if customer profile exists
   if (custUserId) {

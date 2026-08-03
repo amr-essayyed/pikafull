@@ -24,16 +24,24 @@ export function parsePhoneWithCountryCode(fullPhone: string | undefined | null) 
   if (!fullPhone) return { countryCode: "+20", number: "" }
   const trimmed = fullPhone.trim()
   
-  // Try to match standard "+20..." prefix first
+  // Try to match standard "+20..." prefix first, or without the "+" sign
   for (const item of COUNTRY_CODES) {
     if (trimmed.startsWith(item.code)) {
       const numberPart = trimmed.slice(item.code.length).trim()
       return { countryCode: item.code, number: numberPart }
     }
+    
+    const codeWithoutPlus = item.code.replace("+", "")
+    // Only match without '+' if the trimmed string itself doesn't start with '+'
+    if (!trimmed.startsWith("+") && trimmed.startsWith(codeWithoutPlus)) {
+      const numberPart = trimmed.slice(codeWithoutPlus.length).trim()
+      return { countryCode: item.code, number: numberPart }
+    }
   }
   
   // Default to +20 (Egypt) if no country code prefix is present
-  return { countryCode: "+20", number: trimmed }
+  // If it starts with + but didn't match any code, we keep it as number
+  return { countryCode: "+20", number: trimmed.startsWith("+") ? trimmed : trimmed }
 }
 
 export function validatePhoneNumber(
