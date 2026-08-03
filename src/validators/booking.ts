@@ -35,11 +35,17 @@ export const bookingSchema = z.object({
         message: "Full name is required for new customers",
       })
     }
-    if (data.email && data.email.trim().length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    if (!data.email || data.email.trim().length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["email"],
-        message: "Please enter a valid email address if provided",
+        message: "Email is required to create a new account",
+      })
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["email"],
+        message: "Please enter a valid email address",
       })
     }
   }

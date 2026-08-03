@@ -71,6 +71,12 @@ export function BookingWizard({
   const [isLoadingSlots, setIsLoadingSlots] = React.useState<boolean>(false)
   const [customerMode, setCustomerMode] = React.useState<"existing" | "new">("existing")
 
+  React.useEffect(() => {
+    if (error && typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    }
+  }, [error])
+
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema) as any,
     defaultValues: {
@@ -543,7 +549,6 @@ export function BookingWizard({
                         <FormItem>
                           <FormLabel>
                             {t('email')}
-                            <span className="text-muted-foreground ml-1 font-normal text-xs">{t('optional')}</span>
                           </FormLabel>
                           <FormControl>
                             <Input type="email" placeholder={t('placeholderEmail')} {...field} />
@@ -852,7 +857,6 @@ export function BookingWizard({
                         <FormItem>
                           <FormLabel>
                             {t('email')}
-                            <span className="text-muted-foreground ml-1 font-normal text-xs">{t('optional')}</span>
                           </FormLabel>
                           <FormControl>
                             <Input type="email" placeholder={t('placeholderEmail')} {...field} />
