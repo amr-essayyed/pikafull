@@ -9,6 +9,7 @@ import { CalendarIcon, User, UserPlus, Check, Minus, Plus } from "lucide-react"
 import { useLocale, useTranslations } from "next-intl"
 
 import { cn } from "@/lib/utils"
+import { parsePhoneWithCountryCode, validatePhoneNumber } from "@/lib/phone-validation"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -243,6 +244,8 @@ export function BookingWizard({
   }
 
   const next = async () => {
+    setError(null)
+
     if (wizardSteps[currentStep].internalName === "Customer Selection") {
       if (customerMode === "existing") {
         const custId = form.getValues("customerId")
@@ -261,18 +264,24 @@ export function BookingWizard({
     if (currentStep < wizardSteps.length - 1) {
       setCurrentStep(step => step + 1)
     } else {
-      await form.handleSubmit(
-        processForm,
-        (errors) => {
-          console.error("Booking form validation errors:", errors)
-          const errorKeys = Object.keys(errors)
-          if (errorKeys.length > 0) {
-            const firstKey = errorKeys[0]
-            const errObj = errors[firstKey as keyof typeof errors]
-            setError(errObj?.message ? String(errObj.message) : "Please fill in all required fields.")
-          }
+      // Manual cross-field validation (replaces superRefine which is broken with Zod v4)
+      const data = form.getValues()
+      let hasError = false
+
+      // Validate phone number format
+      if (data.phone) {
+        const parsed = parsePhoneWithCountryCode(data.phone)
+        const res = validatePhoneNumber(parsed.countryCode, parsed.number, true)
+        if (!res.isValid) {
+          form.setError("phone", { type: "custom", message: res.error || "Invalid phone number" })
+          hasError = true
         }
-      )()
+      }
+
+      if (hasError) return
+
+      // Submit directly instead of going through handleSubmit which re-validates the full schema
+      await processForm(data)
     }
   }
 

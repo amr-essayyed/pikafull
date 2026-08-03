@@ -1,5 +1,4 @@
 import { z } from "zod"
-import { parsePhoneWithCountryCode, validatePhoneNumber } from "@/lib/phone-validation"
 
 export const bookingSchema = z.object({
   customerId: z.string().optional(),
@@ -26,40 +25,6 @@ export const bookingSchema = z.object({
   
   saveToProfile: z.boolean().default(true),
   paymentMethod: z.enum(["cash", "card", "bank_transfer", "online"]).default("online"),
-}).superRefine((data, ctx) => {
-  if (!data.customerId) {
-    if (!data.fullName || data.fullName.trim().length < 2) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["fullName"],
-        message: "Full name is required for new customers",
-      })
-    }
-    if (!data.email || data.email.trim().length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["email"],
-        message: "Email is required to create a new account",
-      })
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["email"],
-        message: "Please enter a valid email address",
-      })
-    }
-  }
-  if (data.phone) {
-    const parsed = parsePhoneWithCountryCode(data.phone)
-    const res = validatePhoneNumber(parsed.countryCode, parsed.number, true)
-    if (!res.isValid) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["phone"],
-        message: res.error || "Invalid phone number",
-      })
-    }
-  }
 })
 
 export type BookingFormData = z.infer<typeof bookingSchema>
