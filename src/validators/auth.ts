@@ -27,6 +27,12 @@ export const registerSchema = z.object({
   phone: z.string().min(1, "Phone number is required"),
 }).superRefine(phoneValidation)
 
+export const adminLoginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+})
+
 export type PhoneFormData = z.infer<typeof phoneSchema>
 export type LoginFormData = z.infer<typeof loginSchema>
 export type RegisterFormData = z.infer<typeof registerSchema>
+export type AdminLoginFormData = z.infer<typeof adminLoginSchema>

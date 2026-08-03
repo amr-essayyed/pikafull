@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form"
 import { useTranslations } from "next-intl"
 
 import { adminLogin } from "@/actions/auth"
-import { loginSchema, type LoginFormData } from "@/validators/auth"
+import { adminLoginSchema, type AdminLoginFormData } from "@/validators/auth"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -27,15 +27,15 @@ export default function AdminLoginPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [isPending, startTransition] = React.useTransition()
 
-  const form = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<AdminLoginFormData>({
+    resolver: zodResolver(adminLoginSchema),
     defaultValues: {
       email: "",
       password: "",
     },
   })
 
-  function onSubmit(values: LoginFormData) {
+  function onSubmit(values: AdminLoginFormData) {
     setError(null)
     startTransition(async () => {
       const formData = new FormData()
