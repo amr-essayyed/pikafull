@@ -304,7 +304,7 @@ export function BookingWizard({
         return ["scheduledDate", "scheduledTime"]
       case "Address & Payment":
         return (!isAuthenticated || !initialCustomerData?.fullName)
-          ? ["fullName", "email", "addressLine1", "city", "phone", "paymentMethod"]
+          ? ["fullName", "addressLine1", "city", "phone", "paymentMethod"]
           : ["addressLine1", "city", "phone", "paymentMethod"]
       default:
         return []
@@ -558,6 +558,7 @@ export function BookingWizard({
                         <FormItem>
                           <FormLabel>
                             {t('email')}
+                            <span className="text-muted-foreground ml-1 font-normal text-xs">{t('optional')}</span>
                           </FormLabel>
                           <FormControl>
                             <Input type="email" placeholder={t('placeholderEmail')} {...field} />
@@ -866,6 +867,7 @@ export function BookingWizard({
                         <FormItem>
                           <FormLabel>
                             {t('email')}
+                            <span className="text-muted-foreground ml-1 font-normal text-xs">{t('optional')}</span>
                           </FormLabel>
                           <FormControl>
                             <Input type="email" placeholder={t('placeholderEmail')} {...field} />

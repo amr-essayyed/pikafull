@@ -50,18 +50,37 @@ export async function createBooking(data: BookingFormData) {
   } 
   // Case B: Admin/Staff creating a booking for a new customer OR Guest booking on public site
   else if (isAdminOrStaff || !user) {
-    if (!data.fullName || !data.email) {
-      return { error: "Please enter customer full name and email address to complete booking." }
+    if (!data.fullName) {
+      return { error: "Please enter customer full name to complete booking." }
+    }
+    if (!data.phone) {
+      return { error: "Please enter a phone number to complete booking." }
     }
 
-    const cleanedEmail = data.email.toLowerCase().trim()
+    // If no email provided, generate a placeholder from the phone number
+    const hasRealEmail = !!(data.email && data.email.trim().length > 0)
+    const cleanedEmail = hasRealEmail
+      ? data.email!.toLowerCase().trim()
+      : `${data.phone.replace(/[^0-9]/g, "")}@phone.placeholder`
 
-    // Check if user profile already exists with this email
-    const { data: existingProfile } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("email", cleanedEmail)
-      .maybeSingle()
+    // Check if user profile already exists with this email or phone
+    let existingProfile = null
+    if (hasRealEmail) {
+      const { data: profileByEmail } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("email", cleanedEmail)
+        .maybeSingle()
+      existingProfile = profileByEmail
+    }
+    if (!existingProfile && data.phone) {
+      const { data: profileByPhone } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("phone", data.phone)
+        .maybeSingle()
+      existingProfile = profileByPhone
+    }
 
     if (existingProfile) {
       targetUserId = (existingProfile as any).id
@@ -133,7 +152,7 @@ export async function createBooking(data: BookingFormData) {
       customerId = (newCustomer as any).id
 
       // Only auto sign-in if guest booking on website (not when admin creates in dashboard)
-      if (!user) {
+      if (!user && hasRealEmail) {
         try {
           await supabase.auth.signInWithPassword({
             email: cleanedEmail,
@@ -144,27 +163,30 @@ export async function createBooking(data: BookingFormData) {
         }
       }
 
-      try {
-        const apiKey = process.env.RESEND_API_KEY
-        if (apiKey) {
-          const resend = new Resend(apiKey)
-          await resend.emails.send({
-            from: 'Pikafull <noreply@4teq.store>',
-            to: cleanedEmail,
-            subject: 'مرحباً بك في بيكافول! تفاصيل حسابك وحجزك',
-            html: `<div dir="rtl" style="font-family: Arial, sans-serif; text-align: right; line-height: 1.6;">
-              <h2>مرحباً ${data.fullName}! 👋</h2>
-              <p>شكراً لطلبك الحجز مع بيكافول (Pikafull)!</p>
-              <p>تم إنشاء حساب جديد لك تلقائياً لمتابعة حالة حجزك ورصيدك.</p>
-              <p><strong>بيانات الدخول:</strong><br/>
-              البريد الإلكتروني: <strong>${cleanedEmail}</strong><br/>
-              كلمة المرور المؤقتة: <strong>${generatedPassword}</strong></p>
-              <p>يرجى تسجيل الدخول وتغيير كلمة المرور الخاصة بك في أقرب وقت.</p>
-            </div>`
-          })
+      // Only send welcome email if a real email was provided
+      if (hasRealEmail) {
+        try {
+          const apiKey = process.env.RESEND_API_KEY
+          if (apiKey) {
+            const resend = new Resend(apiKey)
+            await resend.emails.send({
+              from: 'Pikafull <noreply@4teq.store>',
+              to: cleanedEmail,
+              subject: 'مرحباً بك في بيكافول! تفاصيل حسابك وحجزك',
+              html: `<div dir="rtl" style="font-family: Arial, sans-serif; text-align: right; line-height: 1.6;">
+                <h2>مرحباً ${data.fullName}! 👋</h2>
+                <p>شكراً لطلبك الحجز مع بيكافول (Pikafull)!</p>
+                <p>تم إنشاء حساب جديد لك تلقائياً لمتابعة حالة حجزك ورصيدك.</p>
+                <p><strong>بيانات الدخول:</strong><br/>
+                البريد الإلكتروني: <strong>${cleanedEmail}</strong><br/>
+                كلمة المرور المؤقتة: <strong>${generatedPassword}</strong></p>
+                <p>يرجى تسجيل الدخول وتغيير كلمة المرور الخاصة بك في أقرب وقت.</p>
+              </div>`
+            })
+          }
+        } catch (emailErr) {
+          console.error("[Resend] Failed to send welcome email:", emailErr)
         }
-      } catch (emailErr) {
-        console.error("[Resend] Failed to send welcome email:", emailErr)
       }
     }
   } 
